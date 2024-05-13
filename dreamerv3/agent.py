@@ -105,16 +105,10 @@ class Agent(nj.Module):
     spaces = {}
     spaces['stepid'] = embodied.Space(np.uint8, 20)
     if self.config.replay_context:
-      latshape = (self.config.dyn.rssm.stoch, self.config.dyn.rssm.classes)
       latdtype = jaxutils.COMPUTE_DTYPE
       latdtype = np.float32 if latdtype == jnp.bfloat16 else latdtype
-      if self.config.dyn.typ == 'rssm':
-        spaces['deter'] = embodied.Space(latdtype, self.config.dyn.rssm.deter)
-      else:
-        for i in range(6):
-          spaces[f'deter{i}'] = embodied.Space(
-              latdtype, self.config.dyn.stack.rnndim)
-      spaces['stoch'] = embodied.Space(np.int32, latshape[:-1])
+      spaces['deter'] = embodied.Space(latdtype, self.config.dyn.rssm.deter)
+      spaces['stoch'] = embodied.Space(np.int32, self.config.dyn.rssm.stoch)
     return spaces
 
   def init_policy(self, batch_size):
