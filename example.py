@@ -11,7 +11,7 @@ def main():
 
   config = embodied.Config(dreamerv3.Agent.configs['defaults'])
   config = config.update({
-      **dreamerv3.Agent.configs['size100m'],
+      **dreamerv3.Agent.configs['size12m'],
       'logdir': f'~/logdir/{embodied.timestamp()}-example',
       'run.train_ratio': 32,
   })
@@ -34,7 +34,7 @@ def main():
         embodied.logger.TerminalOutput(config.filter),
         embodied.logger.JSONLOutput(logdir, 'metrics.jsonl'),
         embodied.logger.TensorBoardOutput(logdir),
-        # embodied.logger.WandbOutput(logdir.name, config=config),
+        embodied.logger.WandBOutput(logdir.name, config=config, project="DreamBackwards", entity="gtxrl")
     ])
 
   def make_replay(config):
