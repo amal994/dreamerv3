@@ -57,6 +57,26 @@ class Agent(nj.Module):
     self.rew = nets.MLP((), **config.rewhead, name='rew')
     self.con = nets.MLP((), **config.conhead, name='con')
 
+    # Creating duplicate world model that would train on an exact deep copy of the dataset. 
+    # The aim to is to ensure that 
+    # 1. Dataset duplication works fine [Pending]
+    # 2. WM duplication does not interfere with the base WM [Partly pending]
+    # 3. Reporting works fine for the duplicated WM [Covered]
+    # 4. Get a broad idea of the perf hit [Covered]
+    
+    # Duplicate World Model
+    self.dup_enc = {
+        'simple': bind(nets.SimpleEncoder, **config.enc.simple),
+    }[config.enc.typ](enc_space, name='dup_enc')
+    self.dup_dec = {
+        'simple': bind(nets.SimpleDecoder, **config.dec.simple),
+    }[config.dec.typ](dec_space, name='dup_dec')
+    self.dup_dyn = {
+        'rssm': bind(nets.RSSM, **config.dyn.rssm),
+    }[config.dyn.typ](name='dup_dyn')
+    self.dup_rew = nets.MLP((), **config.rewhead, name='dup_rew')
+    self.dup_con = nets.MLP((), **config.conhead, name='dup_con')
+
     # Actor
     kwargs = {}
     kwargs['shape'] = {
@@ -94,7 +114,12 @@ class Agent(nj.Module):
     mlp = scales.pop('dec_mlp')
     scales.update({k: cnn for k in self.dec.imgkeys})
     scales.update({k: mlp for k in self.dec.veckeys})
-    self.scales = scales
+    self.scales = scales # Mad : Check usage of scales
+
+    # Dup Optimizer
+    self.dup_opt = jaxutils.Optimizer(lr, **kw, name='dup_opt')
+    self.dup_modules = [
+        self.dup_enc, self.dup_dyn, self.dup_dec, self.dup_rew, self.dup_con]
 
   @property
   def policy_keys(self):
@@ -191,6 +216,16 @@ class Agent(nj.Module):
     mets, (out, carry, metrics) = self.opt(
         self.modules, self.loss, data, carry, has_aux=True)
     metrics.update(mets)
+
+    # Training the dup WM
+    # Mad : Need to update data
+
+    # dup_mets, (dup_out, dup_carry, dup_metrics) = self.dup_opt(
+    #     self.dup_modules, self.dup_loss, data, dup_carry, has_aux=True)
+    dup_mets, (dup_out, _, dup_metrics) = self.dup_opt(
+        self.dup_modules, self.dup_loss, data, carry, has_aux=True)
+    metrics.update(dup_metrics)
+
     self.updater()
     outs = {}
 
@@ -222,7 +257,58 @@ class Agent(nj.Module):
 
     return outs, carry, metrics
 
-  def loss(self, data, carry, update=True):
+  # dup_loss only updates the duplicate WM (encoder, dynamic model, decoder) 
+  # without affecting the policy
+  def dup_loss(self, data, carry, update=True):
+    metrics = {}
+    prevlat, prevact = carry
+
+    # Replay rollout
+    prevacts = {
+        k: jnp.concatenate([prevact[k][:, None], data[k][:, :-1]], 1)
+        for k in self.act_space}
+    prevacts = jaxutils.onehot_dict(prevacts, self.act_space)
+    embed = self.dup_enc(data)
+    newlat, outs = self.dup_dyn.observe(prevlat, prevacts, embed, data['is_first'])
+    rew_feat = outs if self.config.reward_grad else sg(outs)
+    dists = dict(
+        **self.dup_dec(outs),
+        reward=self.dup_rew(rew_feat, training=True),
+        cont=self.dup_con(outs, training=True))
+    losses = {k: -v.log_prob(f32(data[k])) for k, v in dists.items()}
+    if self.config.contdisc:
+      del losses['cont']
+      softlabel = data['cont'] * (1 - 1 / self.config.horizon)
+      losses['cont'] = -dists['cont'].log_prob(softlabel)
+    dynlosses, mets = self.dup_dyn.loss(outs, **self.config.rssm_loss)
+    losses.update(dynlosses)
+    metrics.update(mets)
+    replay_outs = outs
+
+    # Metrics
+    metrics.update({f'{k}_loss': v.mean() for k, v in losses.items()})
+    metrics.update({f'{k}_loss_std': v.std() for k, v in losses.items()})
+    metrics['data_rew/max'] = jnp.abs(data['reward']).max()
+    metrics['data_rew/mean'] = data['reward'].mean()
+    metrics['data_rew/std'] = data['reward'].std()
+    if 'reward' in dists:
+      stats = jaxutils.balance_stats(dists['reward'], data['reward'], 0.1)
+      metrics.update({f'rewstats/{k}': v for k, v in stats.items()})
+    if 'dup_cont' in dists:
+      stats = jaxutils.balance_stats(dists['dup_cont'], data['dup_cont'], 0.5)
+      metrics.update({f'constats/{k}': v for k, v in stats.items()})
+    metrics['activation/embed'] = jnp.abs(embed).mean()
+
+    # Combine
+    losses = {k: v * self.scales[k] for k, v in losses.items()}
+    loss = jnp.stack([v.mean() for k, v in losses.items()]).sum()
+    newact = {k: data[k][:, -1] for k in self.act_space}
+    outs = {'replay_outs': replay_outs, 'prevacts': prevacts, 'embed': embed}
+    outs.update({f'{k}_loss': v for k, v in losses.items()})
+    carry = (newlat, newact)
+    return loss, (outs, carry, metrics)
+
+  def loss(self, data, carry, update=True): 
     metrics = {}
     prevlat, prevact = carry
 
@@ -445,6 +531,42 @@ class Agent(nj.Module):
       error = (pred - true + 1) / 2
       video = jnp.concatenate([true, pred, error], 2)
       metrics[f'openloop/{key}'] = jaxutils.video_grid(video)
+
+    # Open loop predictions for duplicated WM
+    _, T_dup = data['is_first'].shape
+    dup_num_obs = min(self.config.report_openl_context, T_dup // 2)
+    # Rerun observe to get the correct intermediate state, because
+    # outs_to_carry doesn't work with num_obs<context.
+    dup_img_start, dup_rec_outs = self.dup_dyn.observe(
+         carry[0],
+        {k: v[:, :dup_num_obs] for k, v in outs['prevacts'].items()},
+        outs['embed'][:, :dup_num_obs],
+        data['is_first'][:, :dup_num_obs])
+    dup_img_acts = {k: v[:, dup_num_obs:] for k, v in outs['prevacts'].items()}
+    dup_img_outs = self.dup_dyn.imagine(dup_img_start, dup_img_acts)[1]
+    dup_rec = dict(
+        **self.dup_dec(dup_rec_outs), reward=self.dup_rew(dup_rec_outs),
+        cont=self.dup_con(dup_rec_outs))
+    dup_img = dict(
+        **self.dup_dec(dup_img_outs), reward=self.dup_rew(dup_img_outs),
+        cont=self.dup_con(dup_img_outs))
+
+    # Duplicated WM Prediction losses
+    dup_data_img = {k: v[:, dup_num_obs:] for k, v in data.items()}
+    dup_losses = {k: -v.log_prob(dup_data_img[k].astype(f32)) for k, v in dup_img.items()}
+    metrics.update({f'dup_openl_{k}_loss': v.mean() for k, v in dup_losses.items()})
+    dup_stats = jaxutils.balance_stats(dup_img['reward'], dup_data_img['reward'], 0.1)
+    metrics.update({f'dup_openl_reward_{k}': v for k, v in dup_stats.items()})
+    dup_stats = jaxutils.balance_stats(dup_img['cont'], dup_data_img['cont'], 0.5)
+    metrics.update({f'dup_openl_cont_{k}': v for k, v in stats.items()})
+
+    # Duplicate WM Video predictions
+    for key in self.dup_dec.imgkeys:
+      dup_true = f32(data[key][:6])
+      dup_pred = jnp.concatenate([dup_rec[key].mode()[:6], dup_img[key].mode()[:6]], 1)
+      dup_error = (dup_pred - dup_true + 1) / 2
+      dup_video = jnp.concatenate([dup_true, dup_pred, dup_error], 2)
+      metrics[f'dup_openloop/{key}'] = jaxutils.video_grid(dup_video)
 
     # Grad norms per loss term
     if self.config.report_gradnorms:
