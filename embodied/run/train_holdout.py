@@ -80,8 +80,10 @@ def train_holdout(
   dataset_eval = agent.dataset(
       bind(eval_replay.dataset, args.batch_size, args.batch_length_eval))
 
-  carry = [agent.init_train(args.batch_size)]
-  carry_report = agent.init_report(args.batch_size)
+  carry, dup_carry = agent.init_train(args.batch_size)
+  carry = [carry]
+  dup_carry = [dup_carry]
+  carry_report, dup_carry_report = agent.init_report(args.batch_size)
 
   def train_step(tran, worker):
     if len(train_replay) < args.batch_size or step < args.train_fill:
@@ -89,7 +91,7 @@ def train_holdout(
     for _ in range(should_train(step)):
       with embodied.timer.section('dataset_next'):
         batch = next(dataset_train)
-      outs, carry[0], mets = agent.train(batch, carry[0])
+      outs, carry[0], dup_carry[0], mets = agent.train(batch, carry[0], dup_carry[0])
       train_fps.step(batch_steps)
       if 'replay' in outs:
         train_replay.update(outs['replay'])
@@ -118,10 +120,10 @@ def train_holdout(
       logger.add(agg.result())
       logger.add(epstats.result(), prefix='epstats')
       if len(train_replay):
-        mets, _ = agent.report(next(dataset_report), init_report)
+        mets, _, _ = agent.report(next(dataset_report), init_report)
         logger.add(mets, prefix='report')
       if len(eval_replay):
-        mets, _ = agent.report(next(dataset_eval), init_report)
+        mets, _, _ = agent.report(next(dataset_eval), init_report)
         logger.add(mets, prefix='eval')
       logger.add(embodied.timer.stats(), prefix='timer')
       logger.add(train_replay.stats(), prefix='replay')

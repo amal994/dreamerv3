@@ -105,14 +105,14 @@ class JAXAgent(embodied.Agent):
   def init_train(self, batch_size):
     seed = self._next_seeds(self.train_sharded)
     batch_size //= len(self.train_mesh.devices)
-    carry = self._init_train(self.params, seed, batch_size)
-    return carry
+    carry, dup_carry = self._init_train(self.params, seed, batch_size)
+    return carry, dup_carry
 
   def init_report(self, batch_size):
     seed = self._next_seeds(self.train_sharded)
     batch_size //= len(self.train_mesh.devices)
-    carry = self._init_report(self.params, seed, batch_size)
-    return carry
+    carry, dup_carry = self._init_report(self.params, seed, batch_size)
+    return carry, dup_carry
 
   @embodied.timer.section('jaxagent_policy')
   def policy(self, obs, carry, mode='train'):
@@ -174,15 +174,15 @@ class JAXAgent(embodied.Agent):
     return acts, outs, carry
 
   @embodied.timer.section('jaxagent_train')
-  def train(self, data, carry):
+  def train(self, data, carry, dup_carry):
     seed = data['seed']
     data = self._filter_data(data)
     allo = {k: v for k, v in self.params.items() if k in self.policy_keys}
     dona = {k: v for k, v in self.params.items() if k not in self.policy_keys}
     with embodied.timer.section('jit_train'):
       with self.train_lock:
-        self.params, outs, carry, mets = self._train(
-            allo, dona, data, carry, seed)
+        self.params, outs, carry, dup_carry, mets = self._train(
+            allo, dona, data, carry, dup_carry, seed)
     self.updates.increment()
 
     if self.should_sync(self.updates) and not self.pending_sync:
@@ -218,17 +218,17 @@ class JAXAgent(embodied.Agent):
           pathlib.GFilePath(outdir).copy(copyto)
           print(f'Copied profiler result {outdir} to {copyto}')
 
-    return return_outs, carry, return_mets
+    return return_outs, carry, dup_carry, return_mets
 
   @embodied.timer.section('jaxagent_report')
-  def report(self, data, carry):
+  def report(self, data, carry, dup_carry):
     seed = data['seed']
     data = self._filter_data(data)
     with embodied.timer.section('jit_report'):
       with self.train_lock:
-        mets, carry = self._report(self.params, data, carry, seed)
+        mets, carry, dup_carry = self._report(self.params, data, carry, dup_carry, seed)
         mets = self._take_mets(fetch_async(mets))
-    return mets, carry
+    return mets, carry, dup_carry
 
   def dataset(self, generator):
     def transform(data):
@@ -306,22 +306,22 @@ class JAXAgent(embodied.Agent):
       pure = nj.pure(self.agent.init_train)
       return pure(params, batch_size, seed=seed)[1]
 
-    def train(alloc, donated, data, carry, seed):
+    def train(alloc, donated, data, carry, dup_carry, seed):
       pure = nj.pure(self.agent.train)
       combined = {**alloc, **donated}
-      params, (outs, carry, mets) = pure(combined, data, carry, seed=seed)
+      params, (outs, carry, dup_carry, mets) = pure(combined, data, carry, dup_carry, seed=seed)
       mets = {k: v[None] for k, v in mets.items()}
-      return params, outs, carry, mets
+      return params, outs, carry, dup_carry, mets
 
     def init_report(params, seed, batch_size):
       pure = nj.pure(self.agent.init_report)
       return pure(params, batch_size, seed=seed)[1]
 
-    def report(params, data, carry, seed):
+    def report(params, data, carry, dup_carry, seed):
       pure = nj.pure(self.agent.report)
-      _, (mets, carry) = pure(params, data, carry, seed=seed)
+      _, (mets, carry, dup_carry) = pure(params, data, carry, dup_carry, seed=seed)
       mets = {k: v[None] for k, v in mets.items()}
-      return mets, carry
+      return mets, carry, dup_carry
 
     from jax.experimental.shard_map import shard_map
     s = jax.sharding.PartitionSpec('i')  # sharded
@@ -337,10 +337,10 @@ class JAXAgent(embodied.Agent):
     if len(self.train_mesh.devices) > 1:
       init_train = lambda params, seed, batch_size, fn=init_train: shard_map(
           lambda params, seed: fn(params, seed, batch_size),
-          self.train_mesh, (m, s), s, check_rep=False)(params, seed)
+          self.train_mesh, (m, s), (s, s), check_rep=False)(params, seed)
       train = shard_map(
           train, self.train_mesh,
-          (m, m, s, s, s), (m, s, s, m), check_rep=False)
+          (m, m, s, s, s, s), (m, s, s, s, m), check_rep=False)
       init_report = lambda params, seed, batch_size, fn=init_report: shard_map(
           lambda params, seed: fn(params, seed, batch_size),
           self.train_mesh, (m, s), s, check_rep=False)(params, seed)
@@ -356,13 +356,13 @@ class JAXAgent(embodied.Agent):
 
     ts, tm = self.train_sharded, self.train_mirrored
     self._init_train = jax.jit(
-        init_train, (tm, ts), ts, static_argnames=['batch_size'])
+        init_train, (tm, ts), (ts, ts), static_argnames=['batch_size'])
     self._train = jax.jit(
-        train, (tm, tm, ts, ts, ts), (tm, ts, ts, tm), donate_argnums=[1])
+        train, (tm, tm, ts, ts, ts, ts), (tm, ts, ts, ts, tm), donate_argnums=[1])
     self._init_report = jax.jit(
-        init_report, (tm, ts), ts, static_argnames=['batch_size'])
+        init_report, (tm, ts), (ts, ts), static_argnames=['batch_size'])
     self._report = jax.jit(
-        report, (tm, ts, ts, ts), (tm, ts))
+        report, (tm, ts, ts, ts, ts), (tm, ts, ts))
 
   def _take_mets(self, mets):
     mets = jax.tree.map(lambda x: x.__array__(), mets)
@@ -383,9 +383,9 @@ class JAXAgent(embodied.Agent):
     data = jax.device_put(self._dummy_batch(self.spaces, (B, T)))
     params = nj.init(self.agent.init_train, static_argnums=[1])(
         {}, B, seed=seed)
-    _, carry = jax.jit(nj.pure(self.agent.init_train), static_argnums=[1])(
+    _, (carry, dup_carry) = jax.jit(nj.pure(self.agent.init_train), static_argnums=[1])(
         params, B, seed=seed)
-    params = nj.init(self.agent.train)(params, data, carry, seed=seed)
+    params = nj.init(self.agent.train)(params, data, carry, dup_carry, seed=seed)
     return jax.device_put(params, self.train_mirrored)
 
   def _next_seeds(self, sharding):
@@ -410,10 +410,10 @@ class JAXAgent(embodied.Agent):
     data = self._dummy_batch(self.spaces, (B, T))
     data = jax.device_put(data, self.train_sharded)
     seed = self._next_seeds(self.train_sharded)
-    carry = self.init_train(self.config.batch_size)
+    carry, dup_carry = self.init_train(self.config.batch_size)
     allo = {k: v for k, v in self.params.items() if k in self.policy_keys}
     dona = {k: v for k, v in self.params.items() if k not in self.policy_keys}
-    self._train = self._train.lower(allo, dona, data, carry, seed)
+    self._train = self._train.lower(allo, dona, data, carry, dup_carry, seed)
 
   def _lower_report(self):
     B = self.config.batch_size
@@ -421,8 +421,9 @@ class JAXAgent(embodied.Agent):
     data = self._dummy_batch(self.spaces, (B, T))
     data = jax.device_put(data, self.train_sharded)
     seed = self._next_seeds(self.train_sharded)
-    carry = self.init_report(self.config.batch_size)
-    self._report = self._report.lower(self.params, data, carry, seed)
+    carry, dup_carry = self.init_report(self.config.batch_size)
+
+    self._report = self._report.lower(self.params, data, carry, dup_carry, seed)
 
 
 def fetch_async(value):

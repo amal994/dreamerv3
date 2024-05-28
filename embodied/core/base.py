@@ -21,7 +21,7 @@ class Agent:
     raise NotImplementedError(
         "policy(obs, carry=None, mode='train') -> act, out, carry")
 
-  def train(self, data, carry=None):
+  def train(self, data, carry=None, dup_carry=None):
     raise NotImplementedError(
         'train(data, carry=None) -> outs, carry, metrics')
 

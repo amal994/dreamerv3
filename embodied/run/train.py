@@ -75,8 +75,10 @@ def train(make_agent, make_replay, make_env, make_logger, args):
       replay.dataset, args.batch_size, args.batch_length)))
   dataset_report = iter(agent.dataset(bind(
       replay.dataset, args.batch_size, args.batch_length_eval)))
-  carry = [agent.init_train(args.batch_size)]
-  carry_report = agent.init_report(args.batch_size)
+  carry, dup_carry = agent.init_train(args.batch_size)
+  carry = [carry]
+  dup_carry = [dup_carry]
+  carry_report, dup_carry_report = agent.init_report(args.batch_size)
 
   def train_step(tran, worker):
     if len(replay) < args.batch_size or step < args.train_fill:
@@ -84,7 +86,7 @@ def train(make_agent, make_replay, make_env, make_logger, args):
     for _ in range(should_train(step)):
       with embodied.timer.section('dataset_next'):
         batch = next(dataset_train)
-      outs, carry[0], mets = agent.train(batch, carry[0])
+      outs, carry[0], dup_carry[0], mets = agent.train(batch, carry[0], dup_carry[0])
       train_fps.step(batch_steps)
       if 'replay' in outs:
         replay.update(outs['replay'])
@@ -109,7 +111,7 @@ def train(make_agent, make_replay, make_env, make_logger, args):
     driver(policy, steps=10)
 
     if should_eval(step) and len(replay):
-      mets, _ = agent.report(next(dataset_report), carry_report)
+      mets, _, _ = agent.report(next(dataset_report), carry_report, dup_carry_report)
       logger.add(mets, prefix='report')
 
     if should_log(step):

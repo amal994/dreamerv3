@@ -24,14 +24,14 @@ class RandomAgent:
     outs = {}
     return act, outs, carry
 
-  def train(self, data, carry=()):
+  def train(self, data, carry=(), dup_carry=()):
     outs = {}
     metrics = {}
-    return outs, carry, metrics
+    return outs, carry, dup_carry, metrics
 
-  def report(self, data, carry=()):
+  def report(self, data, carry=(), dup_carry=()):
     report = {}
-    return report, carry
+    return report, carry, dup_carry
 
   def dataset(self, generator):
     return generator()

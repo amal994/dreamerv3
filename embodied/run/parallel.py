@@ -140,8 +140,8 @@ def parallel_learner(agent, barrier, args):
 
   dataset_train = agent.dataset(bind(parallel_dataset, 'sample_batch_train'))
   dataset_report = agent.dataset(bind(parallel_dataset, 'sample_batch_report'))
-  carry = agent.init_train(args.batch_size)
-  carry_report = agent.init_report(args.batch_size)
+  carry, dup_carry = agent.init_train(args.batch_size)
+  carry_report, dup_carry_report = agent.init_report(args.batch_size)
   should_save()  # Delay first save.
   should_eval()  # Delay first eval.
 
@@ -150,7 +150,7 @@ def parallel_learner(agent, barrier, args):
     with embodied.timer.section('learner_batch_next'):
       batch = next(dataset_train)
     with embodied.timer.section('learner_train_step'):
-      outs, carry, mets = agent.train(batch, carry)
+      outs, carry, dup_carry, mets = agent.train(batch, carry, dup_carry)
     if 'replay' in outs:
       with embodied.timer.section('learner_replay_update'):
         updater.update(outs['replay'])
@@ -160,7 +160,7 @@ def parallel_learner(agent, barrier, args):
 
     if should_eval():
       with embodied.timer.section('learner_eval'):
-        mets, _ = agent.report(next(dataset_report), carry_report)
+        mets, _, _ = agent.report(next(dataset_report), carry_report, dup_carry_report)
         logger.add(prefix(mets, 'report'))
 
     if should_log():

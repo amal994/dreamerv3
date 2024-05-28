@@ -146,7 +146,7 @@ class Agent(nj.Module):
     prevact = {
         k: jnp.zeros((batch_size, *v.shape), v.dtype)
         for k, v in self.act_space.items()}
-    return (self.dyn.initial(batch_size), prevact)
+    return (self.dyn.initial(batch_size), prevact), (self.dup_dyn.initial(batch_size), prevact)
 
   def init_report(self, batch_size):
     return self.init_train(batch_size)
@@ -188,7 +188,7 @@ class Agent(nj.Module):
         if s.discrete else act[k] for k, s in self.act_space.items()}
     return act, outs, (lat, act)
 
-  def train(self, data, carry):
+  def train(self, data, carry, dup_carry):
     self.config.jax.jit and embodied.print(
         'Tracing train function', color='yellow')
     data = self.preprocess(data)
@@ -204,6 +204,10 @@ class Agent(nj.Module):
           context['stoch'], self.config.dyn.rssm.classes))
       prevlat = self.dyn.outs_to_carry(context)
       carry = prevlat, carry[1]
+
+      dup_prevlat = self.dup_dyn.outs_to_carry(context)
+      dup_carry = dup_prevlat, dup_carry[1]
+
       data = {k: v[:, K:] for k, v in data.items()}
       stepid = stepid[:, K:]
 
@@ -220,10 +224,8 @@ class Agent(nj.Module):
     # Training the dup WM
     # Mad : Need to update data
 
-    # dup_mets, (dup_out, dup_carry, dup_metrics) = self.dup_opt(
-    #     self.dup_modules, self.dup_loss, data, dup_carry, has_aux=True)
-    dup_mets, (dup_out, _, dup_metrics) = self.dup_opt(
-        self.dup_modules, self.dup_loss, data, carry, has_aux=True)
+    dup_mets, (dup_out, dup_carry, dup_metrics) = self.dup_opt(
+        self.dup_modules, self.dup_loss, data, dup_carry, has_aux=True)
     metrics.update(dup_metrics)
 
     self.updater()
@@ -255,13 +257,13 @@ class Agent(nj.Module):
       assert stepid.shape[:2] == priority.shape == bs
       outs['replay'] = {'stepid': stepid, 'priority': priority}
 
-    return outs, carry, metrics
+    return outs, carry, dup_carry, metrics
 
   # dup_loss only updates the duplicate WM (encoder, dynamic model, decoder) 
   # without affecting the policy
-  def dup_loss(self, data, carry, update=True):
+  def dup_loss(self, data, dup_carry, update=True):
     metrics = {}
-    prevlat, prevact = carry
+    prevlat, prevact = dup_carry
 
     # Replay rollout
     prevacts = {
@@ -305,8 +307,8 @@ class Agent(nj.Module):
     newact = {k: data[k][:, -1] for k in self.act_space}
     outs = {'replay_outs': replay_outs, 'prevacts': prevacts, 'embed': embed}
     outs.update({f'{k}_loss': v for k, v in losses.items()})
-    carry = (newlat, newact)
-    return loss, (outs, carry, metrics)
+    dup_carry = (newlat, newact)
+    return loss, (outs, dup_carry, metrics)
 
   def loss(self, data, carry, update=True): 
     metrics = {}
@@ -484,11 +486,11 @@ class Agent(nj.Module):
     carry = (newlat, newact)
     return loss, (outs, carry, metrics)
 
-  def report(self, data, carry):
+  def report(self, data, carry, dup_carry):
     self.config.jax.jit and embodied.print(
         'Tracing report function', color='yellow')
     if not self.config.report:
-      return {}, carry
+      return {}, carry, dup_carry
     metrics = {}
     data = self.preprocess(data)
 
@@ -533,16 +535,19 @@ class Agent(nj.Module):
       metrics[f'openloop/{key}'] = jaxutils.video_grid(video)
 
     # Open loop predictions for duplicated WM
+    _, (dup_outs, dup_carry_out, dup_mets) = self.dup_loss(data, dup_carry, update=False)
+    metrics.update(dup_mets)
+
     _, T_dup = data['is_first'].shape
     dup_num_obs = min(self.config.report_openl_context, T_dup // 2)
     # Rerun observe to get the correct intermediate state, because
     # outs_to_carry doesn't work with num_obs<context.
     dup_img_start, dup_rec_outs = self.dup_dyn.observe(
-         carry[0],
-        {k: v[:, :dup_num_obs] for k, v in outs['prevacts'].items()},
-        outs['embed'][:, :dup_num_obs],
+         dup_carry[0],
+        {k: v[:, :dup_num_obs] for k, v in dup_outs['prevacts'].items()},
+        dup_outs['embed'][:, :dup_num_obs],
         data['is_first'][:, :dup_num_obs])
-    dup_img_acts = {k: v[:, dup_num_obs:] for k, v in outs['prevacts'].items()}
+    dup_img_acts = {k: v[:, dup_num_obs:] for k, v in dup_outs['prevacts'].items()}
     dup_img_outs = self.dup_dyn.imagine(dup_img_start, dup_img_acts)[1]
     dup_rec = dict(
         **self.dup_dec(dup_rec_outs), reward=self.dup_rew(dup_rec_outs),
@@ -579,7 +584,7 @@ class Agent(nj.Module):
         except KeyError:
           print(f'Skipping gradnorm summary for missing loss: {key}')
 
-    return metrics, carry_out
+    return metrics, carry_out, dup_carry_out
 
   def preprocess(self, obs):
     spaces = {**self.obs_space, **self.act_space, **self.aux_spaces}

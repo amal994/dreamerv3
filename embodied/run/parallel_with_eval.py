@@ -152,18 +152,18 @@ def parallel_learner(agent, barrier, args):
 
   def evaluate(dataset):
     num_batches = args.replay_length_eval // args.batch_length_eval
-    carry = agent.init_report(args.batch_size)
+    carry, dup_carry = agent.init_report(args.batch_size)
     agg = embodied.Agg()
     for _ in range(num_batches):
       batch = next(dataset)
-      metrics, carry = agent.report(batch, carry)
+      metrics, carry, dup_carry = agent.report(batch, carry, dup_carry)
       agg.add(metrics)
     return agg.result()
 
   dataset_train = agent.dataset(bind(parallel_dataset, 'train'))
   dataset_report = agent.dataset(bind(parallel_dataset, 'report'))
   dataset_eval = agent.dataset(bind(parallel_dataset, 'eval'))
-  carry = agent.init_train(args.batch_size)
+  carry, dup_carry = agent.init_train(args.batch_size)
   should_save()  # Delay first save.
   should_eval()  # Delay first eval.
 
@@ -172,7 +172,7 @@ def parallel_learner(agent, barrier, args):
     with embodied.timer.section('learner_batch_next'):
       batch = next(dataset_train)
     with embodied.timer.section('learner_train_step'):
-      outs, carry, mets = agent.train(batch, carry)
+      outs, carry, dup_carry, mets = agent.train(batch, carry, dup_carry)
     if 'replay' in outs:
       with embodied.timer.section('learner_replay_update'):
         updater.update(outs['replay'])
