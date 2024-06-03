@@ -59,8 +59,8 @@ class Agent(nj.Module):
 
     # Creating duplicate world model that would train on an exact deep copy of the dataset. 
     # The aim to is to ensure that 
-    # 1. Dataset duplication works fine [Pending]
-    # 2. WM duplication does not interfere with the base WM [Partly pending]
+    # 1. Dataset duplication works fine [Covered]
+    # 2. WM duplication does not interfere with the base WM [Covered]
     # 3. Reporting works fine for the duplicated WM [Covered]
     # 4. Get a broad idea of the perf hit [Covered]
     
@@ -216,16 +216,24 @@ class Agent(nj.Module):
           nj.seed(), data['is_first'][:, :1].shape) > self.config.reset_context
       data['is_first'] = jnp.concatenate([
           data['is_first'][:, :1] & keep, data['is_first'][:, 1:]], 1)
+      
+    dup_data = data.copy()
 
     mets, (out, carry, metrics) = self.opt(
         self.modules, self.loss, data, carry, has_aux=True)
     metrics.update(mets)
 
     # Training the dup WM
-    # Mad : Need to update data
+    dup_data['action'] = jax.numpy.flip(dup_data['action'], axis=1) #
+    dup_data['image'] = jax.numpy.flip(dup_data['image'], axis=1) #
+    dup_data['is_first'] = jax.numpy.flip(dup_data['is_terminal'], axis=1) 
+    dup_data['is_last'] = jax.numpy.flip(dup_data['is_first'], axis=1) 
+    dup_data['is_terminal'] = jax.numpy.flip(dup_data['is_first'], axis=1) 
+    dup_data['reward'] = jax.numpy.flip(dup_data['reward'], axis=1) #
+    dup_data['cont'] = jax.numpy.flip(dup_data['cont'], axis=1) #
 
     dup_mets, (dup_out, dup_carry, dup_metrics) = self.dup_opt(
-        self.dup_modules, self.dup_loss, data, dup_carry, has_aux=True)
+        self.dup_modules, self.dup_loss, dup_data, dup_carry, has_aux=True)
     metrics.update(dup_metrics)
 
     self.updater()
@@ -535,10 +543,19 @@ class Agent(nj.Module):
       metrics[f'openloop/{key}'] = jaxutils.video_grid(video)
 
     # Open loop predictions for duplicated WM
-    _, (dup_outs, dup_carry_out, dup_mets) = self.dup_loss(data, dup_carry, update=False)
+    dup_data = data.copy()
+    dup_data['action'] = jax.numpy.flip(dup_data['action'], axis=1) #
+    dup_data['image'] = jax.numpy.flip(dup_data['image'], axis=1) #
+    dup_data['is_first'] = jax.numpy.flip(dup_data['is_terminal'], axis=1) 
+    dup_data['is_last'] = jax.numpy.flip(dup_data['is_first'], axis=1) 
+    dup_data['is_terminal'] = jax.numpy.flip(dup_data['is_first'], axis=1) 
+    dup_data['reward'] = jax.numpy.flip(dup_data['reward'], axis=1) #
+    dup_data['cont'] = jax.numpy.flip(dup_data['cont'], axis=1) #
+
+    _, (dup_outs, dup_carry_out, dup_mets) = self.dup_loss(dup_data, dup_carry, update=False)
     metrics.update(dup_mets)
 
-    _, T_dup = data['is_first'].shape
+    _, T_dup = dup_data['is_first'].shape
     dup_num_obs = min(self.config.report_openl_context, T_dup // 2)
     # Rerun observe to get the correct intermediate state, because
     # outs_to_carry doesn't work with num_obs<context.
@@ -546,7 +563,7 @@ class Agent(nj.Module):
          dup_carry[0],
         {k: v[:, :dup_num_obs] for k, v in dup_outs['prevacts'].items()},
         dup_outs['embed'][:, :dup_num_obs],
-        data['is_first'][:, :dup_num_obs])
+        dup_data['is_first'][:, :dup_num_obs])
     dup_img_acts = {k: v[:, dup_num_obs:] for k, v in dup_outs['prevacts'].items()}
     dup_img_outs = self.dup_dyn.imagine(dup_img_start, dup_img_acts)[1]
     dup_rec = dict(
@@ -557,7 +574,7 @@ class Agent(nj.Module):
         cont=self.dup_con(dup_img_outs))
 
     # Duplicated WM Prediction losses
-    dup_data_img = {k: v[:, dup_num_obs:] for k, v in data.items()}
+    dup_data_img = {k: v[:, dup_num_obs:] for k, v in dup_data.items()}
     dup_losses = {k: -v.log_prob(dup_data_img[k].astype(f32)) for k, v in dup_img.items()}
     metrics.update({f'dup_openl_{k}_loss': v.mean() for k, v in dup_losses.items()})
     dup_stats = jaxutils.balance_stats(dup_img['reward'], dup_data_img['reward'], 0.1)
@@ -567,7 +584,7 @@ class Agent(nj.Module):
 
     # Duplicate WM Video predictions
     for key in self.dup_dec.imgkeys:
-      dup_true = f32(data[key][:6])
+      dup_true = f32(dup_data[key][:6])
       dup_pred = jnp.concatenate([dup_rec[key].mode()[:6], dup_img[key].mode()[:6]], 1)
       dup_error = (dup_pred - dup_true + 1) / 2
       dup_video = jnp.concatenate([dup_true, dup_pred, dup_error], 2)
