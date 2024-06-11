@@ -552,6 +552,7 @@ class Agent(nj.Module):
     dup_data['reward'] = jax.numpy.flip(dup_data['reward'], axis=1) #
     dup_data['cont'] = jax.numpy.flip(dup_data['cont'], axis=1) #
 
+
     _, (dup_outs, dup_carry_out, dup_mets) = self.dup_loss(dup_data, dup_carry, update=False)
     metrics.update(dup_mets)
 
@@ -580,7 +581,7 @@ class Agent(nj.Module):
     dup_stats = jaxutils.balance_stats(dup_img['reward'], dup_data_img['reward'], 0.1)
     metrics.update({f'dup_openl_reward_{k}': v for k, v in dup_stats.items()})
     dup_stats = jaxutils.balance_stats(dup_img['cont'], dup_data_img['cont'], 0.5)
-    metrics.update({f'dup_openl_cont_{k}': v for k, v in stats.items()})
+    metrics.update({f'dup_openl_cont_{k}': v for k, v in dup_stats.items()})
 
     # Duplicate WM Video predictions
     for key in self.dup_dec.imgkeys:
@@ -589,6 +590,55 @@ class Agent(nj.Module):
       dup_error = (dup_pred - dup_true + 1) / 2
       dup_video = jnp.concatenate([dup_true, dup_pred, dup_error], 2)
       metrics[f'dup_openloop/{key}'] = jaxutils.video_grid(dup_video)
+
+    # IDEA: Compare the Dup world model with the original world model to see how similar they are.
+    # Start: Comparison with old world model.
+    # Original WM with Dup WM comparison Open loop predictions
+    del dup_data
+
+    wm_img_rev = {}
+    wm_img_copy = img.copy()
+    wm_img = wm_img_copy['image'].mode()
+    wm_img_rev['image'] = jax.numpy.flip(wm_img, axis=1)
+    wm_img_rew = wm_img_copy['reward'].mode()
+    wm_img_rev['reward'] = jax.numpy.flip(wm_img_rew, axis=1) #
+
+    wm_img_cont = wm_img_copy['cont'].mode()
+    wm_img_cont = wm_img_copy['cont'].mode()
+    wm_img_rev['cont'] = jax.numpy.flip(wm_img_cont, axis=1) #
+
+    # Open Loop predictions for original WM with Dup WM.
+    dup_wm_losses = {k: -v.log_prob(wm_img_rev[k].astype(f32)) for k, v in dup_img.items()}
+    metrics.update({f'dup_wm_openl_{k}_loss': v.mean() for k, v in dup_wm_losses.items()})
+    dup_wm_stats = jaxutils.balance_stats(dup_img['reward'], wm_img_rev['reward'], 0.1)
+    metrics.update({f'dup_wm_openl_reward_{k}': v for k, v in dup_wm_stats.items()})
+    dup_wm_stats = jaxutils.balance_stats(dup_img['cont'], wm_img_rev['cont'], 0.5)
+    metrics.update({f'dup_wm_openl_cont_{k}': v for k, v in dup_wm_stats.items()})
+
+    wm_rec_rev = {}
+    wm_rec_copy = rec.copy()
+    wm_rec = wm_rec_copy['image'].mode()
+    wm_rec_rev['image'] = jax.numpy.flip(wm_rec, axis=1)
+    wm_rec_rew = wm_rec_copy['reward'].mode()
+    wm_rec_rev['reward'] = jax.numpy.flip(wm_rec_rew, axis=1) #
+    wm_rec_cont = wm_img_copy['cont'].mode()
+    wm_rec_rev['cont'] = jax.numpy.flip(wm_rec_cont, axis=1) #
+
+    # Duplicate WM vs OG WM Video predictions
+    for key in self.dup_dec.imgkeys:
+      dup_true = f32(jnp.concatenate([wm_rec_rev[key][:6], wm_img_rev[key][:6]], 1))
+      dup_pred = jnp.concatenate([dup_rec[key].mode()[:6], dup_img[key].mode()[:6]], 1)
+      dup_error = (dup_pred - dup_true + 1) / 2
+      dup_video = jnp.concatenate([dup_true, dup_pred, dup_error], 2)
+      metrics[f'dup_wm_openloop/{key}'] = jaxutils.video_grid(dup_video)
+    del wm_img_rev, wm_rec_rev
+    del wm_img_copy, wm_rec_copy
+    del wm_rec_rew, wm_rec_cont, wm_rec
+    del wm_img_rew, wm_img_cont, wm_img
+    #torch.cuda.empty_cache()
+    # END: Comparison with old world model.
+
+
 
     # Grad norms per loss term
     if self.config.report_gradnorms:
