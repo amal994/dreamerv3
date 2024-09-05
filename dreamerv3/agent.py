@@ -123,7 +123,7 @@ class Agent(nj.Module):
 
   @property
   def policy_keys(self):
-    return '/(enc|dyn|actor)/'
+    return '/(enc|dyn|dec|actor)/'
 
   @property
   def aux_spaces(self):
@@ -186,6 +186,28 @@ class Agent(nj.Module):
     act = {
         k: jnp.nanargmax(act[k], -1).astype(jnp.int32)
         if s.discrete else act[k] for k, s in self.act_space.items()}
+    if mode == "eval":
+        embodied.print("Agent.py::policy:lat", lat)
+        #prevact = {k: jnp.expand_dims(v, 0) for k, v in prevact.items()}
+        embodied.print("Agent.py::policy:prevact", prevact)
+        img_outs = self.dyn.imagine(lat, prevact, bdims=1)[1]
+        img_outs = {k: jnp.expand_dims(v, 0) for k, v in img_outs.items()}
+        embodied.print("Agent.py::policy:img_outs", img_outs)
+        embodied.print("Getting ready to decode image!")
+        imgs = self.dec(img_outs)
+        embodied.print("Agent.py::policy:rec_outs", out)
+
+        rec_outs = {k: jnp.expand_dims(v, 0) for k, v in out.items()}
+        embodied.print("Agent.py::policy:rec_outs", rec_outs)
+
+        rec = self.dec(rec_outs)
+        for key in self.dec.imgkeys:
+            pred = jnp.squeeze(jnp.concatenate([rec[key].mode(), imgs[key].mode()], 1), 0)
+            embodied.print("Agent.py::policy:pred ", pred)
+            embodied.print("Agent.py::policy:obs[key ", obs[key])
+            error = (pred - f32(obs[key]) + 1) / 2
+            outs[f'{key}_pred'] = pred
+            outs[f'{key}_error'] = error
     return act, outs, (lat, act)
 
   def train(self, data, carry, dup_carry):

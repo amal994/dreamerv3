@@ -154,7 +154,7 @@ def make_logger(config):
       embodied.logger.JSONLOutput(logdir, 'scores.jsonl', 'episode/score'),
       embodied.logger.TensorBoardOutput(
           logdir, config.run.log_video_fps, config.tensorboard_videos),
-      # embodied.logger.WandbOutput(logdir.name, ...),
+      embodied.logger.WandBOutput(logdir, config=config, project="DreamBackwards", entity="gtxrl")
   ], multiplier)
   return logger
 
