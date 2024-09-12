@@ -32,7 +32,7 @@ class TestAgent:
     return stats
 
   def init_policy(self, batch_size):
-    return (np.zeros(batch_size),)
+    return (np.zeros(batch_size),), (np.zeros(batch_size),)
 
   def init_train(self, batch_size):
     return (np.zeros(batch_size),)

@@ -5,3 +5,5 @@ from .train_holdout import train_holdout
 
 from . import parallel
 from . import parallel_with_eval
+
+from .what_if_validation import what_if_validation

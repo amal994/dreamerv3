@@ -6,9 +6,10 @@ import numpy as np
 
 class Crafter(embodied.Env):
 
-  def __init__(self, task, size=(64, 64), logs=False, logdir=None, seed=None):
+  def __init__(self, task, size=(64, 64), logs=False, logdir=None, seed=None, needs_episode_reset=False):
     assert task in ('reward', 'noreward')
     import crafter
+    print('Crafter __init__ seed = ', seed)
     self._env = crafter.Env(size=size, reward=(task == 'reward'), seed=seed)
     self._logs = logs
     self._logdir = logdir and embodied.Path(logdir)
@@ -18,6 +19,8 @@ class Crafter(embodied.Env):
     self._reward = None
     self._achievements = crafter.constants.achievements.copy()
     self._done = True
+    self.needs_episode_reset = needs_episode_reset
+    print('action names = ', self._env.action_names)
 
   @property
   def obs_space(self):
@@ -44,7 +47,11 @@ class Crafter(embodied.Env):
 
   def step(self, action):
     if action['reset'] or self._done:
-      self._episode += 1
+      if self.needs_episode_reset:
+        self._env._episode = -1
+      else:
+        self._episode += 1
+      
       self._length = 0
       self._reward = 0
       self._done = False

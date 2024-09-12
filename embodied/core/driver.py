@@ -36,7 +36,10 @@ class Driver:
         k: np.zeros((self.length,) + v.shape, v.dtype)
         for k, v in self.act_space.items()}
     self.acts['reset'] = np.ones(self.length, bool)
-    self.carry = init_policy and init_policy(self.length)
+    if init_policy is None: 
+      self.carry, self.dup_carry = None, None
+    else: 
+      self.carry, self.dup_carry = init_policy(self.length)
 
   def close(self):
     if self.parallel:
@@ -49,11 +52,33 @@ class Driver:
 
   def __call__(self, policy, steps=0, episodes=0):
     step, episode = 0, 0
+    decoded_img_images = None
     while step < steps or episode < episodes:
-      step, episode = self._step(policy, step, episode)
+      step, episode, decoded_img_image = self._step(policy, step, episode)
+      decoded_img_image = decoded_img_image[np.newaxis, :, :, :]
+      decoded_img_images = decoded_img_image if decoded_img_images is None else np.concatenate([decoded_img_images, decoded_img_image], axis=0)
+    return decoded_img_images
+
+  def _perform_action(self, actions, step, episode):
+    l = len(actions)
+    acts = [{k: v[i] for k, v in actions[0].items()} for i in range(l)]
+    if self.parallel:
+      [pipe.send(('step', act)) for pipe, act in zip(self.pipes, acts)]
+      obs = [self._receive(pipe) for pipe in self.pipes]
+    else:
+      NotImplementedError('Driver::_perform_action has not been tested for self.parallel == False')
+      # obs = [env.step(act) for env, act in zip(self.envs, actions)]
+
+    obs = {k: np.stack([x[k] for x in obs]) for k in obs[0].keys()}
+    assert all(len(x) == self.length for x in obs.values()), obs
+
+    step += len(obs['is_first'])
+    episode += obs['is_last'].sum()
+    return step, episode, obs    
 
   def _step(self, policy, step, episode):
-    acts = self.acts
+    acts = self.acts   
+    print('Driver::_step acts[action] = ', acts['action'])
     assert all(len(x) == self.length for x in acts.values())
     assert all(isinstance(v, np.ndarray) for v in acts.values())
     acts = [{k: v[i] for k, v in acts.items()} for i in range(self.length)]
@@ -64,7 +89,9 @@ class Driver:
       obs = [env.step(act) for env, act in zip(self.envs, acts)]
     obs = {k: np.stack([x[k] for x in obs]) for k in obs[0].keys()}
     assert all(len(x) == self.length for x in obs.values()), obs
-    acts, outs, self.carry = policy(obs, self.carry, **self.kwargs)
+
+    acts, outs, self.carry, decoded_img_image = policy(obs, self.carry, **self.kwargs)
+    
     assert all(k not in acts for k in outs), (
         list(outs.keys()), list(acts.keys()))
     if obs['is_last'].any():
@@ -78,7 +105,7 @@ class Driver:
       [fn(trn, i, **self.kwargs) for fn in self.callbacks]
     step += len(obs['is_first'])
     episode += obs['is_last'].sum()
-    return step, episode
+    return step, episode, decoded_img_image['image'][0]
 
   def _mask(self, value, mask):
     while mask.ndim < value.ndim:

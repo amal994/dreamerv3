@@ -129,6 +129,15 @@ def main(argv=None):
         bind(make_replay, config, 'replay', rate_limit=True),
         bind(make_replay, config, 'replay_eval', is_eval=True), args)
 
+  elif args.script == 'what_if_validation':
+    if config['task'] == 'crafter_reward':
+      embodied.run.what_if_validation(
+        bind(make_agent, config),
+        bind(make_env, config),
+        bind(make_logger, config), args)    
+    else:
+      print('What if Validation only works for Crafter at present')
+
   else:
     raise NotImplementedError(args.script)
 

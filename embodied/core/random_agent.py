@@ -15,6 +15,9 @@ class RandomAgent:
 
   def init_report(self, batch_size):
     return ()
+  
+  def rev_step(self, obs, alt_action):
+    return ()
 
   def policy(self, obs, carry=(), mode='train'):
     batch_size = len(obs['is_first'])

@@ -7,7 +7,7 @@ class Agent:
 
   def init_policy(self, batch_size):
     raise NotImplementedError(
-        "init_policy(batch_size) -> carry")
+        "init_policy(batch_size) -> carry, dup_carry")
 
   def init_train(self, batch_size):
     raise NotImplementedError(
@@ -16,6 +16,10 @@ class Agent:
   def init_report(self, batch_size):
     raise NotImplementedError(
         "init_report(batch_size) -> carry")
+
+  def rev_step(self, obs, alt_action):
+     raise NotImplementedError(
+        "rev_step(self, obs, alt_action) -> None")
 
   def policy(self, obs, carry=None, mode='train'):
     raise NotImplementedError(
