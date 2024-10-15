@@ -21,6 +21,14 @@ class Agent:
      raise NotImplementedError(
         "rev_step(self, obs, alt_action) -> None")
 
+  def rev_step_in_one_go(self, obs, alt_actions):
+     raise NotImplementedError(
+        "rev_step(self, obs, alt_actions) -> None")
+
+  def rev_step_with_consequences(self, obs, alt_action):
+     raise NotImplementedError(
+        "rev_step(self, obs, alt_action) -> None")
+
   def policy(self, obs, carry=None, mode='train'):
     raise NotImplementedError(
         "policy(obs, carry=None, mode='train') -> act, out, carry")

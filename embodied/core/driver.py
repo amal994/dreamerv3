@@ -55,8 +55,9 @@ class Driver:
     decoded_img_images = None
     while step < steps or episode < episodes:
       step, episode, decoded_img_image = self._step(policy, step, episode)
-      decoded_img_image = decoded_img_image[np.newaxis, :, :, :]
-      decoded_img_images = decoded_img_image if decoded_img_images is None else np.concatenate([decoded_img_images, decoded_img_image], axis=0)
+      if decoded_img_image is not None:
+        decoded_img_image = decoded_img_image['image'][0][np.newaxis, :]
+        decoded_img_images = decoded_img_image if decoded_img_images is None else np.concatenate([decoded_img_images, decoded_img_image], axis=0)
     return decoded_img_images
 
   def _perform_action(self, actions, step, episode):
@@ -78,7 +79,6 @@ class Driver:
 
   def _step(self, policy, step, episode):
     acts = self.acts   
-    print('Driver::_step acts[action] = ', acts['action'])
     assert all(len(x) == self.length for x in acts.values())
     assert all(isinstance(v, np.ndarray) for v in acts.values())
     acts = [{k: v[i] for k, v in acts.items()} for i in range(self.length)]
@@ -105,7 +105,7 @@ class Driver:
       [fn(trn, i, **self.kwargs) for fn in self.callbacks]
     step += len(obs['is_first'])
     episode += obs['is_last'].sum()
-    return step, episode, decoded_img_image['image'][0]
+    return step, episode, decoded_img_image
 
   def _mask(self, value, mask):
     while mask.ndim < value.ndim:

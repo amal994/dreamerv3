@@ -115,7 +115,90 @@ class JAXAgent(embodied.Agent):
     batch_size //= len(self.train_mesh.devices)
     carry, dup_carry = self._init_report(self.params, seed, batch_size)
     return carry, dup_carry
-  
+
+  def rev_step_in_one_go(self, obs, alt_actions, dup_carry):
+    obs = self._filter_data(obs)
+
+    with embodied.timer.section('prepare_dup_carry'):
+      if self.jaxcfg.fetch_policy_carry:
+        dup_carry = jax.tree.map(
+            np.stack, dup_carry, is_leaf=lambda x: isinstance(x, list))
+      else:
+        with self.policy_lock:
+          dup_carry = self._stack(dup_carry)
+
+    with embodied.timer.section('check_rev_inputs'):
+      for key, space in self.obs_space.items():
+        if key in self.keys:
+          assert np.isfinite(obs[key]).all(), (obs[key], key, space)
+
+    with embodied.timer.section('upload_rev_inputs'):
+      with self.policy_lock:
+        obs, alt_actions, dup_carry = jax.device_put((obs, alt_actions, dup_carry), self.policy_sharded)
+        seed = self._next_seeds(self.policy_sharded)
+
+    with embodied.timer.section('jit_rev'):
+      with self.policy_lock:
+        decoded_imgs = self._rev_step_in_one_go(self.policy_params, obs, seed, alt_actions[0], dup_carry)
+
+    with embodied.timer.section('swap_rev_params'):
+      with self.policy_lock:
+        if self.pending_sync:
+          old = self.policy_params
+          self.policy_params = self.pending_sync
+          jax.tree.map(lambda x: x.delete(), old)
+          self.pending_sync = None
+
+    with embodied.timer.section('fetch_rev_outputs'):
+      if self.jaxcfg.fetch_policy_carry:
+        decoded_imgs = self._take_outs(fetch_async((decoded_imgs)))
+      else:
+        decoded_imgs = self._take_outs(fetch_async((decoded_imgs)))
+
+    return decoded_imgs
+
+  def rev_step_with_consequences(self, obs, alt_action, dup_carry):
+    obs = self._filter_data(obs)
+
+    with embodied.timer.section('prepare_dup_carry'):
+      if self.jaxcfg.fetch_policy_carry:
+        dup_carry = jax.tree.map(
+            np.stack, dup_carry, is_leaf=lambda x: isinstance(x, list))
+      else:
+        with self.policy_lock:
+          dup_carry = self._stack(dup_carry)
+
+    with embodied.timer.section('check_rev_inputs'):
+      for key, space in self.obs_space.items():
+        if key in self.keys:
+          assert np.isfinite(obs[key]).all(), (obs[key], key, space)
+
+    with embodied.timer.section('upload_rev_inputs'):
+      with self.policy_lock:
+        obs, alt_action, dup_carry = jax.device_put((obs, alt_action, dup_carry), self.policy_sharded)
+        seed = self._next_seeds(self.policy_sharded)
+
+    with embodied.timer.section('jit_rev'):
+      with self.policy_lock:
+        dup_carry, decoded_img = self._rev_step_with_consequences(self.policy_params, obs, seed, alt_action[0], dup_carry)
+
+    with embodied.timer.section('swap_rev_params'):
+      with self.policy_lock:
+        if self.pending_sync:
+          old = self.policy_params
+          self.policy_params = self.pending_sync
+          jax.tree.map(lambda x: x.delete(), old)
+          self.pending_sync = None
+
+    with embodied.timer.section('fetch_rev_outputs'):
+      if self.jaxcfg.fetch_policy_carry:
+        dup_carry, decoded_img = self._take_outs(fetch_async((decoded_img)))
+      else:
+        dup_carry = self._split(dup_carry)
+        decoded_img = self._take_outs(fetch_async((decoded_img)))
+
+    return dup_carry, decoded_img
+
   def rev_step(self, obs, alt_action, dup_carry):
     obs = self._filter_data(obs)
 
@@ -351,6 +434,16 @@ class JAXAgent(embodied.Agent):
       ret = pure(params, obs, alt_action, dup_carry, seed=seed)
       return ret[1]
 
+    def rev_step_in_one_go(params, obs, seed, alt_actions, dup_carry):
+      pure = nj.pure(self.agent.rev_step_in_one_go)
+      ret = pure(params, obs, alt_actions, dup_carry, seed=seed)
+      return ret[1]
+
+    def rev_step_with_consequences(params, obs, seed, alt_action, dup_carry):
+      pure = nj.pure(self.agent.rev_step_with_consequences)
+      ret = pure(params, obs, alt_action, dup_carry, seed=seed)
+      return ret[1]
+
     def init_train(params, seed, batch_size):
       pure = nj.pure(self.agent.init_train)
       return pure(params, batch_size, seed=seed)[1]
@@ -386,6 +479,12 @@ class JAXAgent(embodied.Agent):
       rev_step = shard_map(
           report, self.policy_mesh,
           (m, s, s, s, s), (s), check_rep=False)
+      rev_step_with_consequences = shard_map(
+          report, self.policy_mesh,
+          (m, s, s, s, s), (s), check_rep=False)
+      rev_step_in_one_go = shard_map(
+          report, self.policy_mesh,
+          (m, s, s, s, s), (s), check_rep=False)
     if len(self.train_mesh.devices) > 1:
       init_train = lambda params, seed, batch_size, fn=init_train: shard_map(
           lambda params, seed: fn(params, seed, batch_size),
@@ -407,6 +506,10 @@ class JAXAgent(embodied.Agent):
         policy, (pm, ps, ps, ps), ps, static_argnames=['mode'])
     self._rev_step = jax.jit(
         rev_step, (pm, ps, ps, ps, ps), ps)
+    self._rev_step_with_consequences = jax.jit(
+        rev_step_with_consequences, (pm, ps, ps, ps, ps), ps)
+    self._rev_step_in_one_go = jax.jit(
+        rev_step_in_one_go, (pm, ps, ps, ps, ps), ps)
 
     ts, tm = self.train_sharded, self.train_mirrored
     self._init_train = jax.jit(

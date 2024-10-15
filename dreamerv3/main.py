@@ -138,6 +138,24 @@ def main(argv=None):
     else:
       print('What if Validation only works for Crafter at present')
 
+  elif args.script == 'did_happen_validation':
+    if config['task'] == 'crafter_reward':
+      embodied.run.did_happen_validation(
+        bind(make_agent, config),
+        bind(make_env, config),
+        bind(make_logger, config), args)    
+    else:
+      print('Did happen Validation only works for Crafter at present')
+
+  elif args.script == 'in_dist_imagination':
+    if config['task'] == 'crafter_reward':
+      embodied.run.in_dist_imagination(
+        bind(make_agent, config),
+        bind(make_env, config),
+        bind(make_logger, config), args)    
+    else:
+      print('In Dist Imagination only works for Crafter at present')
+
   else:
     raise NotImplementedError(args.script)
 

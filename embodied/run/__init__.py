@@ -7,3 +7,5 @@ from . import parallel
 from . import parallel_with_eval
 
 from .what_if_validation import what_if_validation
+from .did_happen_validation import did_happen_validation
+from .in_dist_imagination import in_dist_imagination

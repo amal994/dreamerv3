@@ -19,6 +19,12 @@ class RandomAgent:
   def rev_step(self, obs, alt_action):
     return ()
 
+  def rev_step_in_one_go(self, obs, alt_actions):
+    return ()
+
+  def rev_step_with_consequences(self, obs, alt_action):
+    return ()
+
   def policy(self, obs, carry=(), mode='train'):
     batch_size = len(obs['is_first'])
     act = {

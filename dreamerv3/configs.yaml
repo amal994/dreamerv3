@@ -1,6 +1,6 @@
 defaults:
 
-  seed: 562
+  seed: 7
   method: name
   task: dummy_disc
   logdir: /dev/null
@@ -73,6 +73,7 @@ defaults:
     driver_parallel: True
     agent_process: False
     remote_replay: False
+    test_images_folder: 'test_images'
 
   wrapper: {length: 0, reset: True, discretize: 0, checks: True}
   env:
