@@ -105,7 +105,7 @@ class Player(Object):
         action = 'sleep'
       else:
         self.sleeping = False
-        self.achievements['wake_up'] += 1
+        # self.achievements['wake_up'] += 1
     if action == 'noop':
       pass
     elif action.startswith('move_'):
@@ -189,27 +189,19 @@ class Player(Object):
       if obj.ripe:
         obj.grown = 0
         self.inventory['food'] += 4
-        self.achievements['eat_plant'] += 1
+        # self.achievements['eat_plant'] += 1
     if isinstance(obj, Fence):
       self.world.remove(obj)
       self.inventory['fence'] += 1
-      self.achievements['collect_fence'] += 1
+      # self.achievements['collect_fence'] += 1
     if isinstance(obj, Zombie):
       obj.health -= damage
-      if obj.health <= 0:
-        self.achievements['defeat_zombie'] += 1
+      # if obj.health <= 0:
+        # self.achievements['defeat_zombie'] += 1
     if isinstance(obj, Skeleton):
       obj.health -= damage
-      if obj.health <= 0:
-        self.achievements['defeat_skeleton'] += 1
-    if isinstance(obj, Cow):
-      obj.health -= damage
-      if obj.health <= 0:
-        self.inventory['food'] += 6
-        self.achievements['eat_cow'] += 1
-        # TODO: Keep track of previous inventory state to do this in a more
-        # general way.
-        self._hunger = 0
+      # if obj.health <= 0:
+        # self.achievements['defeat_skeleton'] += 1
 
   def _do_material(self, target, material):
     if material == 'water':
@@ -260,12 +252,12 @@ class Player(Object):
     self.inventory[name] += info['gives']
     self.achievements[f'make_{name}'] += 1
 
-
 class Cow(Object):
 
-  def __init__(self, world, pos):
+  def __init__(self, world, pos, is_static = False):
     super().__init__(world, pos)
     self.health = 3
+    self.is_static = is_static
 
   @property
   def texture(self):
@@ -274,18 +266,20 @@ class Cow(Object):
   def update(self):
     if self.health <= 0:
       self.world.remove(self)
-    if self.random.uniform() < 0.5:
-      direction = self.random_dir()
-      self.move(direction)
+    if self.is_static is False:
+      if self.random.uniform() < 0.5:
+        direction = self.random_dir()
+        self.move(direction)
 
 
 class Zombie(Object):
 
-  def __init__(self, world, pos, player):
+  def __init__(self, world, pos, player, is_static = False):
     super().__init__(world, pos)
     self.player = player
     self.health = 5
     self.cooldown = 0
+    self.is_static = is_static
 
   @property
   def texture(self):
@@ -295,10 +289,11 @@ class Zombie(Object):
     if self.health <= 0:
       self.world.remove(self)
     dist = self.distance(self.player)
-    if dist <= 8 and self.random.uniform() < 0.9:
-      self.move(self.toward(self.player, self.random.uniform() < 0.8))
-    else:
-      self.move(self.random_dir())
+    if self.is_static is False:
+      if dist <= 8 and self.random.uniform() < 0.9:
+        self.move(self.toward(self.player, self.random.uniform() < 0.8))
+      else:
+        self.move(self.random_dir())
     dist = self.distance(self.player)
     if dist <= 1:
       if self.cooldown:
@@ -314,11 +309,12 @@ class Zombie(Object):
 
 class Skeleton(Object):
 
-  def __init__(self, world, pos, player):
+  def __init__(self, world, pos, player, is_static = False):
     super().__init__(world, pos)
     self.player = player
     self.health = 3
     self.reload = 0
+    self.is_static = is_static
 
   @property
   def texture(self):
@@ -329,16 +325,20 @@ class Skeleton(Object):
       self.world.remove(self)
     self.reload = max(0, self.reload - 1)
     dist = self.distance(self.player.pos)
-    if dist <= 3:
-      moved = self.move(-self.toward(self.player, self.random.uniform() < 0.6))
-      if moved:
-        return
+    if self.is_static is False:
+      if dist <= 3:
+        moved = self.move(-self.toward(self.player, self.random.uniform() < 0.6))
+        if moved:
+          return
     if dist <= 5 and self.random.uniform() < 0.5:
       self._shoot(self.toward(self.player))
-    elif dist <= 8 and self.random.uniform() < 0.3:
-      self.move(self.toward(self.player, self.random.uniform() < 0.6))
-    elif self.random.uniform() < 0.2:
-      self.move(self.random_dir())
+      return 
+
+    if self.is_static is False:
+      if dist <= 8 and self.random.uniform() < 0.3:
+        self.move(self.toward(self.player, self.random.uniform() < 0.6))
+      elif self.random.uniform() < 0.2:
+        self.move(self.random_dir())
 
   def _shoot(self, direction):
     if self.reload > 0:

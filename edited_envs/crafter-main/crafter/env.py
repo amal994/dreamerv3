@@ -2,11 +2,14 @@ import collections
 
 import numpy as np
 
+from datetime import datetime
+from PIL import Image
+
 from . import constants
 from . import engine
 from . import objects
 from . import worldgen
-
+from . import worldgen_static
 
 # Gym is an optional dependency.
 try:
@@ -25,11 +28,16 @@ except ImportError:
 class Env(BaseClass):
 
   def __init__(
-      self, area=(64, 64), view=(9, 9), size=(64, 64),
-      reward=True, length=10000, seed=None):
+      self, area=(9, 9), view=(7, 7), size=(64, 64), #area is the size of the world; view is the observable area; size is the resolution of the visible area
+      reward=True, length=10000, seed=None,
+      mapfile=None, objfile=None, show_inventory=False, initial_pos=None, assets="crafter"):
     view = np.array(view if hasattr(view, '__len__') else (view, view))
     size = np.array(size if hasattr(size, '__len__') else (size, size))
     seed = np.random.randint(0, 2**31 - 1) if seed is None else seed
+    self._mapfile = mapfile
+    self._objfile = objfile
+    self._show_inventory = show_inventory
+    self._initial_pos = initial_pos
     self._area = area
     self._view = view
     self._size = size
@@ -37,13 +45,25 @@ class Env(BaseClass):
     self._length = length
     self._seed = seed
     self._episode = 0
+    self._increment_count = 0
     self._world = engine.World(area, constants.materials, (12, 12))
-    self._textures = engine.Textures(constants.root / 'assets')
+    if assets == "crafter":
+      self._textures = engine.Textures(constants.root / 'assets')
+    elif assets == "rps":
+      self._textures = engine.Textures(constants.root / 'rps_assets')
+    else:
+      self._textures = engine.Textures(constants.root / 'heist_assets')
     item_rows = int(np.ceil(len(constants.items) / view[0]))
-    self._local_view = engine.LocalView(
+
+    if self._show_inventory:
+      self._local_view = engine.LocalView(
         self._world, self._textures, [view[0], view[1] - item_rows])
-    self._item_view = engine.ItemView(
-        self._textures, [view[0], item_rows])
+      self._item_view = engine.ItemView(
+          self._textures, [view[0], item_rows])
+    else:
+          self._local_view = engine.LocalView(
+        self._world, self._textures, [view[0], view[1]])
+
     self._sem_view = engine.SemanticView(self._world, [
         objects.Player, objects.Cow, objects.Zombie,
         objects.Skeleton, objects.Arrow, objects.Plant])
@@ -54,6 +74,7 @@ class Env(BaseClass):
     # Some libraries expect these attributes to be set.
     self.reward_range = None
     self.metadata = None
+
 
   @property
   def observation_space(self):
@@ -68,26 +89,32 @@ class Env(BaseClass):
     return constants.actions
 
   def reset(self):
-    center = (self._world.area[0] // 2, self._world.area[1] // 2)
+    player_starting_pos = self._initial_pos if self._initial_pos is not None else (self._world.area[0] // 2, self._world.area[1] // 2)
     self._episode += 1
     self._step = 0
     self._world.reset(seed=hash((self._seed, self._episode)) % (2 ** 31 - 1))
     self._update_time()
-    self._player = objects.Player(self._world, center)
+    self._player = objects.Player(self._world, player_starting_pos)
     self._last_health = self._player.health
     self._world.add(self._player)
     self._unlocked = set()
-    worldgen.generate_world(self._world, self._player)
+    if self._mapfile is not None:
+      print('Generating static world')
+      worldgen_static.generate_world(self._world, self._player, self._mapfile, self._objfile)
+    else:
+      worldgen.generate_world(self._world, self._player)
     return self._obs()
 
   def step(self, action):
+    #print('Action taken => ', constants.actions[action])
     self._step += 1
+    reward = 0.0
     self._update_time()
     self._player.action = constants.actions[action]
     for obj in self._world.objects:
       if self._player.distance(obj) < 2 * max(self._view):
         obj.update()
-    if self._step % 10 == 0:
+    if self._step % 10 == 0 and self._mapfile is None:
       for chunk, objs in self._world.chunks.items():
         # xmin, xmax, ymin, ymax = chunk
         # center = (xmax - xmin) // 2, (ymax - ymin) // 2
@@ -101,10 +128,20 @@ class Env(BaseClass):
         if count > 0 and name not in self._unlocked}
     if unlocked:
       self._unlocked |= unlocked
-      reward += 1.0
+      # reward += 1.0
+      # print('Health + unlocked reward = ', reward)
+
     dead = self._player.health <= 0
+    if dead:
+      print('Player dead')
+      # reward = -3 #Mad TODO:Temp
     over = self._length and self._step >= self._length
+    if over:
+      print('Run length reached ', self._step)
+    elif len(self._unlocked) == 22:
+      over = True
     done = dead or over
+    #Mad TODO: add info for a new run
     info = {
         'inventory': self._player.inventory.copy(),
         'achievements': self._player.achievements.copy(),
@@ -112,22 +149,40 @@ class Env(BaseClass):
         'semantic': self._sem_view(),
         'player_pos': self._player.pos,
         'reward': reward,
+        'unlocked': unlocked,
+        'player_killed': dead,
+        'action_taken': constants.actions[action]
     }
     if not self._reward:
       reward = 0.0
+    # print('Reward = ', reward)
     return obs, reward, done, info
 
   def render(self, size=None):
     size = size or self._size
+    # print('size = ', size, ', _size = ', self._view)
     unit = size // self._view
     canvas = np.zeros(tuple(size) + (3,), np.uint8)
     local_view = self._local_view(self._player, unit)
-    item_view = self._item_view(self._player.inventory, unit)
-    view = np.concatenate([local_view, item_view], 1)
+    if self._show_inventory:
+      item_view = self._item_view(self._player.inventory, unit)
+      view = np.concatenate([local_view, item_view], 1)
+    else:
+      view = local_view
+
+    #Removing inventory view from the visible area
+
     border = (size - (size // self._view) * self._view) // 2
     (x, y), (w, h) = border, view.shape[:2]
     canvas[x: x + w, y: y + h] = view
-    return canvas.transpose((1, 0, 2))
+    edited_canvas = canvas.transpose((1, 0, 2))
+
+    # image_name = self._mapfile + '_' + str(self._initial_pos[0]) + '_' + str(self._initial_pos[1]) + '_' + str(self._increment_count)
+    # img = Image.fromarray(edited_canvas, 'RGB')
+    # img.save('artifacts/game_images/crafter_' + image_name + '.png')
+    # self._increment_count+=1
+
+    return edited_canvas
 
   def _obs(self):
     return self.render()

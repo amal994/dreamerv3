@@ -1,4 +1,5 @@
 from .env import Env
+from .coffee_rewards_wrapper import Coffee_rewards_wrapper
 from .recorder import Recorder
 
 try:

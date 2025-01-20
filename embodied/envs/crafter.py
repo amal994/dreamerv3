@@ -1,16 +1,21 @@
-import json
-
 import embodied
+import json
 import numpy as np
+import pathlib
+import ruamel.yaml as yaml
 
+import crafter
 
 class Crafter(embodied.Env):
 
-  def __init__(self, task, size=(64, 64), logs=False, logdir=None, seed=None, needs_episode_reset=False):
+  def __init__(self, task, scene_label='static_size_13_set_0', env_index=0, 
+               view = (7, 7), size=(64, 64), show_inventory=True, seed=None, 
+               logs=False, logdir=None, needs_episode_reset=False):
     assert task in ('reward', 'noreward')
-    import crafter
+
     print('Crafter __init__ seed = ', seed)
-    self._env = crafter.Env(size=size, reward=(task == 'reward'), seed=seed)
+    # self._env = crafter.Env(size=size, reward=(task == 'reward'), seed=seed)
+    self._env = GameEnvCreator().get_env(task = task, scene_label=scene_label, view = view, size = size, show_inventory=show_inventory, seed = seed, env_index=env_index)
     self._logs = logs
     self._logdir = logdir and embodied.Path(logdir)
     self._logdir and self._logdir.mkdir()
@@ -100,3 +105,41 @@ class Crafter(embodied.Env):
 
   def render(self):
     return self._env.render()
+
+class GameEnvCreator():
+    def __init__(self) -> None:
+        root = pathlib.Path(__file__).parent
+        self.env_scenes = dict()
+        
+        for key, value in yaml.YAML(typ='safe').load((root / 'crafter_env_setup_data.yaml').read_text()).items():
+            self.env_scenes[key] = value
+
+    def get_env(self, task,
+                scene_label, view, size, show_inventory, seed=None,
+                env_index=0, assets_name="crafter"):
+        scene_set = self.env_scenes['scenes'][scene_label]
+        print('scene_set = ', scene_set)
+        scene_count = len(scene_set)
+        env_index = env_index % scene_count
+        print('env_index = ', env_index)
+        scene = scene_set[env_index]
+        print('scene = ', scene)
+
+        required_achievements = scene.get('required_achievements', None)
+        initial_pos = scene.get('initial_pos', None)
+
+        print('Getting env for scene_label = ', scene_label, ', scene_count = ', scene_count, ', env_index = ', env_index, ', view = ', view, ', size = ', size,
+              ', show_inventory = ', show_inventory,
+              ', area = ', scene['area'][0], ', ', scene['area'][1], ', mapfile = ', scene['mat_map'], ', objfile = ', scene['obj_map'],
+              ', required_achievements = ', required_achievements, ', max_steps = ', scene['max_steps'],
+              ', initial_pos = ', initial_pos
+              )
+
+        env = crafter.Env(area=(scene['area'][0], scene['area'][1]), view=view, size=size, 
+                          reward=(task == 'reward'), seed=seed,
+                          mapfile=scene['mat_map'], objfile=scene['obj_map'], show_inventory=show_inventory, initial_pos=initial_pos, assets=assets_name)
+        env = crafter.Coffee_rewards_wrapper(env,
+                                     required_achievements=required_achievements,
+                                     max_steps=scene['max_steps'],
+                                     env_label=scene['mat_map'])
+        return env
