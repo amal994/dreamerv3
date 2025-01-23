@@ -28,7 +28,7 @@ defaults:
     logical_cpus: 0
     debug: False
     policy_devices: [0]
-    train_devices: [0]
+    train_devices: [1]
     sync_every: 1
     profiler: False
     transfer_guard: True
@@ -89,7 +89,7 @@ defaults:
   # Agent
   report: True
   report_gradnorms: False
-  batch_size: 12
+  batch_size: 8
   batch_length: 65
   batch_length_eval: 33
   replay_length: 0

@@ -34,7 +34,7 @@ def in_dist_imagination(make_agent, make_env, make_logger, args):
   trajectory_cache = run_utils.TrajectoryCache(['image', 'reward', 'is_first', 'is_last', 'is_terminal', 'log_reward', 'action'])
   image_util = run_utils.ImageUtil(base_folder=args.test_images_folder, experiment_label='in_dist_imagination')
 
-  fns = [bind(make_env, i, needs_episode_reset = True) for i in range(args.num_envs)]
+  fns = [bind(make_env, i, needs_episode_reset = True) for i in range(1)] # Temporarily hard coding value to 1 Mad:TODO: Remove this
   driver = embodied.Driver(fns, args.driver_parallel)
   driver.on_step(lambda tran, _: experiment_tracker.step.increment())
   driver.on_step(lambda tran, _: experiment_tracker.policy_fps.step())
@@ -51,8 +51,8 @@ def in_dist_imagination(make_agent, make_env, make_logger, args):
   driver.reset(agent.init_policy)
   # Make the agent go through a regular based actions selected by its own policy
   while experiment_tracker.step < args.steps:
-    fwd_images = driver(policy, steps=10)
-    decoded_fwd_images = fwd_images if decoded_fwd_images is None else np.concatenate([decoded_fwd_images, fwd_images], axis=0)
+    fwd_images = driver(policy, steps=1)
+    decoded_fwd_images = fwd_images if decoded_fwd_images is None else np.concatenate([decoded_fwd_images, fwd_images], axis=0) 
     experiment_tracker.log_stats()
   
   num_recorded_trans = trajectory_cache.get_cache_count()
