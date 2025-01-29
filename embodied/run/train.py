@@ -23,12 +23,6 @@ def train(make_agent, make_replay, make_env, make_logger, args):
   policy_fps = embodied.FPS()
   train_fps = embodied.FPS()
 
-  best_catalog = {
-    'score': float('-inf'), 
-    'length': float('inf'), 
-    'should_save_score_based': False
-  }
-
   batch_steps = args.batch_size * (args.batch_length - args.replay_context)
   should_expl = embodied.when.Until(args.expl_until)
   should_train = embodied.when.Ratio(args.train_ratio / batch_steps)
@@ -71,12 +65,6 @@ def train(make_agent, make_replay, make_env, make_logger, args):
       if len(rew) > 1:
         result['reward_rate'] = (np.abs(rew[1:] - rew[:-1]) >= 0.01).mean()
       epstats.add(result)
-      if best_catalog['score'] < current_score:
-        best_catalog['score'] = current_score
-        best_catalog['should_save_score_based'] = True
-      elif (best_catalog['score'] == current_score) and (best_catalog['length'] > current_length):
-        best_catalog['length'] = current_length
-        best_catalog['should_save_score_based'] = True
 
   fns = [bind(make_env, i, scene_label = 'static_size_13_set_0', env_index = i) for i in range(args.num_envs)] #Edited specifically for static-crafter #'static_size_13_set_0',
   driver = embodied.Driver(fns, args.driver_parallel)
@@ -138,8 +126,7 @@ def train(make_agent, make_replay, make_env, make_logger, args):
       logger.add({'fps/train': train_fps.result()})
       logger.write()
 
-    if best_catalog['should_save_score_based']:
+    if should_save(step):
       checkpoint.save()
-      best_catalog['should_save_score_based'] = False
 
   logger.close()

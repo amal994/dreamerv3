@@ -35,12 +35,6 @@ def _set_material(world, pos, tunnels, materials_data):
   S => sand
   T => tree
   L => lava
-  C => coal
-  A => cave
-  I => iron
-  D => diamond
-  B => table
-  F => furnace
   """
   """
   Newly added materials
@@ -52,6 +46,10 @@ def _set_material(world, pos, tunnels, materials_data):
   V => stove
   Q => grinder
   M => mason jar
+  A => microwave
+  K => chocolate plant
+  B => beaker
+  C => coffee_powder
   """
   x, y = pos
   material = materials_data[y, x].strip()
@@ -59,6 +57,14 @@ def _set_material(world, pos, tunnels, materials_data):
     world[x, y] = 'water'
   elif material == 'G':
     world[x, y] = 'grass'
+  elif material == 'A':
+    world[x, y] = 'microwave'
+  elif material == 'K':
+    world[x, y] = 'chocolate_plant'
+  elif material == 'B':
+    world[x, y] = 'beaker'
+  elif material == 'C':
+    world[x, y] = 'coffee_powder'
   elif material == 'O': 
     world[x, y] = 'stone'
   elif material == 'P':
@@ -70,18 +76,6 @@ def _set_material(world, pos, tunnels, materials_data):
     world[x, y] = 'tree'
   elif material == 'L':
     world[x, y] = 'lava'
-  elif material == 'C':
-    world[x, y] = 'coal'
-  elif material == 'A':
-    world[x, y] = 'path'
-  elif material == 'I':
-    world[x, y] = 'iron'
-  elif material == 'D':
-    world[x, y] = 'diamond'
-  elif material == 'B':
-    world[x, y] = 'table'
-  elif material == 'F':
-    world[x, y] = 'furnace'
   elif material == 'E':
     world[x, y] = 'coffee_plant'
   elif material == 'U':
@@ -102,7 +96,6 @@ def _set_material(world, pos, tunnels, materials_data):
     world[x, y] = 'cow'
   else:
     world[x, y] = 'sand'
-  # print('Material[', x, '][', y, '] = ', materials_data[x, y], ' => ', world[x, y])
 
 def _set_object(world, pos, player, entities_data):
   pass

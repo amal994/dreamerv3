@@ -43,6 +43,10 @@ materials:
   - grinder
   - mason_jar
   - cow
+  - chocolate_plant
+  - coffee_powder
+  - beaker
+  - microwave
 
 walkable:
   - grass
@@ -76,6 +80,9 @@ items:
   spice: {max: 9, initial: 0}
   spinach: {max: 9, initial: 0}
   hot_sauce: {max: 9, initial: 0}
+  chocolate_bar: {max: 9, initial: 0}
+  boiled_water: {max: 9, initial: 0}
+  lava: {max: 9, initial: 0}
 
 collect:
   # tree: {require: {}, receive: {wood: 1}, leaves: grass}
@@ -91,6 +98,8 @@ collect:
   spice: {require: {}, receive: {spice: 1}, leaves: path}
   spinach: {require: {}, receive: {spinach: 1}, leaves: path}
   hot_sauce: {require: {}, receive: {hot_sauce: 1}, leaves: path}
+  chocolate_plant: {require: {}, receive: {chocolate_bar: 1}, leaves: grass}
+  coffee_powder: {require: {}, receive: {coffee_powder: 1}, leaves: path}
 
 # place:
 #   stone: {uses: {stone: 1}, where: [grass, sand, path, water, lava], type: material}
@@ -109,37 +118,22 @@ make:
   boiled_milk: {uses: {milk: 1}, nearby: [stove], gives: 1}
   coffee_powder: {uses: {roasted_coffee_bean: 1}, nearby: [grinder], gives: 1}
   coffee: {uses: {coffee_powder: 1, boiled_milk: 1, sugar_cube: 1, spice: 1}, nearby: [mason_jar], gives: 1}  
+  boiled_water: {uses: {drink: 1}, nearby: [stove], gives: 1}
+  lava: {uses: {hot_sauce: 1}, nearby: [stove], gives: 1}
 
 achievements:
-  - make_coffee_powder
-  - make_coffee
-  - make_roasted_coffee_bean
-  - make_boiled_milk
   - collect_coffee_bean
   - collect_milk
   - collect_sugar_cube
   - collect_spice
   - collect_spinach
   - collect_hot_sauce
-  # - collect_coal
-  # - collect_diamond
   - collect_drink
-  # - collect_iron
-  # - collect_sapling
-  # - collect_stone
-  # - collect_wood
-  # - defeat_skeleton
-  # - defeat_zombie
-  # - eat_cow
-  # - eat_plant
-  # - make_iron_pickaxe
-  # - make_iron_sword
-  # - make_stone_pickaxe
-  # - make_stone_sword
-  # - make_wood_pickaxe
-  # - make_wood_sword
-  # - place_furnace
-  # - place_plant
-  # - place_stone
-  # - place_table
-  # - wake_up
+  - collect_chocolate_bar
+  - collect_coffee_powder
+  - make_coffee_powder
+  - make_coffee
+  - make_roasted_coffee_bean
+  - make_boiled_milk
+  - make_boiled_water
+  - make_lava

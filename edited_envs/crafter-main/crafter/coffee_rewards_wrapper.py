@@ -97,8 +97,6 @@ class Coffee_rewards_wrapper: #(gym.core.Wrapper):
             info["TimeLimit.truncated"] = True
             done = True
 
-        print('coffee_rewards_wrapper::step::reward = ', reward)
-
         return obs, reward, done, info
 
     def is_achievement_reward_limit_reached(self, achievement):
