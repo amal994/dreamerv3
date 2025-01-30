@@ -30,7 +30,8 @@ class Env(BaseClass):
   def __init__(
       self, area=(9, 9), view=(7, 7), size=(64, 64), #area is the size of the world; view is the observable area; size is the resolution of the visible area
       reward=True, length=10000, seed=None,
-      mapfile=None, objfile=None, show_inventory=False, initial_pos=None, assets="crafter"):
+      mapfile=None, objfile=None, show_inventory=False, initial_pos=None, assets="crafter", 
+      recipe_id=0):
     view = np.array(view if hasattr(view, '__len__') else (view, view))
     size = np.array(size if hasattr(size, '__len__') else (size, size))
     seed = np.random.randint(0, 2**31 - 1) if seed is None else seed
@@ -38,6 +39,7 @@ class Env(BaseClass):
     self._objfile = objfile
     self._show_inventory = show_inventory
     self._initial_pos = initial_pos
+    self._recipe_id = recipe_id
     self._area = area
     self._view = view
     self._size = size
@@ -94,7 +96,7 @@ class Env(BaseClass):
     self._step = 0
     self._world.reset(seed=hash((self._seed, self._episode)) % (2 ** 31 - 1))
     self._update_time()
-    self._player = objects.Player(self._world, player_starting_pos)
+    self._player = objects.Player(self._world, player_starting_pos, self._recipe_id)
     self._last_health = self._player.health
     self._world.add(self._player)
     self._unlocked = set()

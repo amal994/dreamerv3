@@ -67,7 +67,7 @@ class Object:
 
 class Player(Object):
 
-  def __init__(self, world, pos):
+  def __init__(self, world, pos, recipe_id):
     super().__init__(world, pos)
     self.facing = (0, 1)
     self.inventory = {
@@ -80,6 +80,9 @@ class Player(Object):
     self._thirst = 0
     self._fatigue = 0
     self._recover = 0
+    self._recipe_id = recipe_id
+
+    constants.make['coffee'] = constants.coffee_recipes[self._recipe_id]
 
   @property
   def texture(self):

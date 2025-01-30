@@ -7,19 +7,72 @@ class Coffee_rewards_wrapper: #(gym.core.Wrapper):
     """
     completion_reward = 5
 
-    rewards_for_achievements = {
-        'collect_coffee_bean': 1,
-        'collect_milk': 1,
-        'collect_sugar_cube': 1,
-        'collect_spice': 1,
-        'collect_spinach': 0,
-        'collect_hot_sauce': 0,
-        'collect_drink': 0,
-        'make_boiled_milk': 1,
-        'make_roasted_coffee_bean': 1,
-        'make_coffee_powder': 1,
-        'make_coffee': 10
-    }
+    rewards_for_achievements = [
+        {   'collect_coffee_bean': 1,
+            'collect_milk': 1,
+            'collect_sugar_cube': 1,
+            'collect_spice': 1,
+            'collect_spinach': 0,
+            'collect_hot_sauce': 0,
+            'collect_drink': 0,
+            'make_boiled_milk': 1,
+            'make_roasted_coffee_bean': 1,
+            'make_coffee_powder': 1,
+            'make_coffee': 10,
+            'collect_chocolate_bar': 0,
+            'collect_coffee_powder': 0,
+            'make_boiled_water': 0,
+            'make_lava': 0
+        }, 
+        {   'collect_coffee_bean': 1,
+            'collect_milk': 1,
+            'collect_sugar_cube': 0,
+            'collect_spice': 0,
+            'collect_spinach': 0,
+            'collect_hot_sauce': 0,
+            'collect_drink': 0,
+            'make_boiled_milk': 1,
+            'make_roasted_coffee_bean': 1,
+            'make_coffee_powder': 1,
+            'make_coffee': 10,
+            'collect_chocolate_bar': 1,
+            'collect_coffee_powder': 0,
+            'make_boiled_water': 0,
+            'make_lava': 0
+        }, 
+        {   'collect_coffee_bean': 1,
+            'collect_milk': 0,
+            'collect_sugar_cube': 0,
+            'collect_spice': 0,
+            'collect_spinach': 0,
+            'collect_hot_sauce': 1,
+            'collect_drink': 1,
+            'make_boiled_milk': 0,
+            'make_roasted_coffee_bean': 1,
+            'make_coffee_powder': 1,
+            'make_coffee': 10,
+            'collect_chocolate_bar': 0,
+            'collect_coffee_powder': 0,
+            'make_boiled_water': 1,
+            'make_lava': 1
+        }, 
+        {   'collect_coffee_bean': 0,
+            'collect_milk': 1,
+            'collect_sugar_cube': 1,
+            'collect_spice': 0,
+            'collect_spinach': 0,
+            'collect_hot_sauce': 0,
+            'collect_drink': 0,
+            'make_boiled_milk': 0,
+            'make_roasted_coffee_bean': 0,
+            'make_coffee_powder': 0,
+            'make_coffee': 10,
+            'collect_chocolate_bar': 0,
+            'collect_coffee_powder': 1,
+            'make_boiled_water': 0,
+            'make_lava': 0
+        }, 
+    ]
 
     achievement_reward_limit = {
         'collect_coffee_bean': 1,
@@ -27,18 +80,22 @@ class Coffee_rewards_wrapper: #(gym.core.Wrapper):
         'collect_sugar_cube': 1,
         'collect_spice': 1,
         'collect_hot_sauce': 1,
+        'collect_chocolate_bar': 1,
+        'collect_coffee_powder': 1,
         'make_boiled_milk': 1,
         'make_roasted_coffee_bean': 1,
         'make_coffee_powder': 1,
-        'make_coffee': 1
+        'make_coffee': 1,
+        'make_boiled_water': 1,
+        'make_lava': 1
     }
 
-    def __init__(self, env, env_label, required_achievements = ['make_coffee'], max_steps = 500):
+    def __init__(self, env, env_label, required_achievements = ['make_coffee'], max_steps = 500, recipe_id = 0):
         # super().__init__(env)
         self.env = env
 
-        self.positive_achievements = {achievement: 0 for (achievement, reward) in self.rewards_for_achievements.items() if reward > 0}
-        self.first_step_achievement = {achievement: -1 for achievement in self.rewards_for_achievements.keys() }
+        self.positive_achievements = {achievement: 0 for (achievement, reward) in self.rewards_for_achievements[recipe_id].items() if reward > 0}
+        self.first_step_achievement = {achievement: -1 for achievement in self.rewards_for_achievements[recipe_id].keys() }
         self.max_count = max_steps
         self.required_achievements = required_achievements
 
@@ -46,6 +103,7 @@ class Coffee_rewards_wrapper: #(gym.core.Wrapper):
         self.step_count = 0
 
         self.label = env_label
+        self.recipe_id = recipe_id
 
     def __getattr__(self, name):
         if name.startswith('__'):
@@ -56,7 +114,7 @@ class Coffee_rewards_wrapper: #(gym.core.Wrapper):
     def reset(self, **kwargs):
         self.prev_achievements = None
         self.step_count = 0
-        self.first_step_achievement = {achievement: -1 for achievement in self.rewards_for_achievements.keys() }
+        self.first_step_achievement = {achievement: -1 for achievement in self.rewards_for_achievements[self.recipe_id].keys() }
         return self.env.reset(**kwargs)
 
     def step(self, action):
@@ -75,7 +133,7 @@ class Coffee_rewards_wrapper: #(gym.core.Wrapper):
         if len(info['achievements']) > 0:
             current_achievements = self.get_current_achievements(info['achievements'], self.prev_achievements)
             for i in range(len(current_achievements)):
-                current_ach_reward = self.rewards_for_achievements[current_achievements[i]]
+                current_ach_reward = self.rewards_for_achievements[self.recipe_id][current_achievements[i]]
                 current_achievement_reward_map[current_achievements[i]] = current_ach_reward
                 achievement_reward += current_ach_reward
             info.update(current_achievement_reward_map = current_achievement_reward_map)
