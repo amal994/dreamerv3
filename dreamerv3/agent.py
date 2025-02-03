@@ -75,8 +75,6 @@ class Agent(nj.Module):
     self.dup_dyn = {
         'rssm': bind(nets.RSSM, **config.dyn.rssm),
     }[config.dyn.typ](name='dup_dyn')
-    self.dup_rew = nets.MLP((), **config.rewhead, name='dup_rew')
-    self.dup_con = nets.MLP((), **config.conhead, name='dup_con')
 
     # Actor
     kwargs = {}
@@ -121,7 +119,7 @@ class Agent(nj.Module):
     dup_lr = copy.deepcopy(lr)
     self.dup_opt = jaxutils.Optimizer(dup_lr, **kw, name='dup_opt')
     self.dup_modules = [
-        self.dup_enc, self.dup_dyn, self.dup_dec, self.dup_rew, self.dup_con]
+        self.dup_enc, self.dup_dyn, self.dup_dec]
 
   @property
   def policy_keys(self):
@@ -289,29 +287,31 @@ class Agent(nj.Module):
       data['is_first'] = jnp.concatenate([
           data['is_first'][:, :1] & keep, data['is_first'][:, 1:]], 1)
       
-    dup_data = data.copy()
+    dup_data = copy.deepcopy(data)
 
     mets, (out, carry, metrics) = self.opt(
         self.modules, self.loss, data, carry, has_aux=True)
     metrics.update(mets)
 
     # Training the dup WM
+    del dup_data['reward']
+    del dup_data['cont']
     dup_data['image'] = jax.numpy.flip(dup_data['image'], axis=1)
     dup_data['is_first'] = jax.numpy.flip(dup_data['is_terminal'], axis=1) 
     dup_data['is_last'] = jax.numpy.flip(dup_data['is_first'], axis=1) 
-    dup_data['is_terminal'] = jax.numpy.flip(dup_data['is_first'], axis=1) 
-    dup_data['reward'] = jax.numpy.flip(dup_data['reward'], axis=1)
-    dup_data['cont'] = jax.numpy.where(dup_data['is_last'], 0, 1)
+    dup_data['is_terminal'] = jax.numpy.flip(dup_data['is_first'], axis=1)
 
     num_batches = data['is_first'].shape[0]
     dup_data['action'] = jax.numpy.flip(dup_data['action'], axis=1)
     dup_data['action'] = jax.numpy.delete(dup_data['action'], np.array([0]), axis=1)
     dup_data['action'] = jnp.append(dup_data['action'], jnp.tile(jnp.array([0]), (num_batches, 1)), axis=1)
 
-    dup_mets, (dup_out, dup_carry, dup_metrics) = self.dup_opt(
+    dup_mets, (_, dup_carry, dup_metrics) = self.dup_opt(
         self.dup_modules, self.dup_loss, dup_data, dup_carry, has_aux=True)
     metrics.update(dup_mets)
     metrics.update(dup_metrics)
+    del dup_data
+
 
     self.updater()
     outs = {}
@@ -357,16 +357,9 @@ class Agent(nj.Module):
     prevacts = jaxutils.onehot_dict(prevacts, self.act_space)
     embed = self.dup_enc(data)
     newlat, outs = self.dup_dyn.observe(prevlat, prevacts, embed, data['is_first'])
-    rew_feat = outs if self.config.reward_grad else sg(outs)
     dists = dict(
-        **self.dup_dec(outs),
-        reward=self.dup_rew(rew_feat, training=True),
-        cont=self.dup_con(outs, training=True))
+        **self.dup_dec(outs))
     losses = {k: -v.log_prob(f32(data[k])) for k, v in dists.items()}
-    if self.config.contdisc:
-      del losses['cont']
-      softlabel = data['cont'] * (1 - 1 / self.config.horizon)
-      losses['cont'] = -dists['cont'].log_prob(softlabel)
     dynlosses, mets = self.dup_dyn.loss(outs, **self.config.rssm_loss)
     losses.update(dynlosses)
     metrics.update(mets)
@@ -375,15 +368,6 @@ class Agent(nj.Module):
     # Metrics
     metrics.update({f'{k}_dup_loss': v.mean() for k, v in losses.items()})
     metrics.update({f'{k}_dup_loss_std': v.std() for k, v in losses.items()})
-    metrics['dup_data_rew/max'] = jnp.abs(data['reward']).max()
-    metrics['dup_data_rew/mean'] = data['reward'].mean()
-    metrics['dup_data_rew/std'] = data['reward'].std()
-    if 'reward' in dists:
-      stats = jaxutils.balance_stats(dists['reward'], data['reward'], 0.1)
-      metrics.update({f'dup_rewstats/{k}': v for k, v in stats.items()})
-    if 'cont' in dists:
-      stats = jaxutils.balance_stats(dists['cont'], data['cont'], 0.5)
-      metrics.update({f'dup_constats/{k}': v for k, v in stats.items()})
     metrics['dup_activation/embed'] = jnp.abs(embed).mean()
 
     # Combine
@@ -620,13 +604,13 @@ class Agent(nj.Module):
       metrics[f'openloop/{key}'] = jaxutils.video_grid(video)
 
     # Open loop predictions for duplicated WM
-    dup_data = data.copy()
+    dup_data = copy.deepcopy(data)
+    del dup_data['reward']
+    del dup_data['cont']
     dup_data['image'] = jax.numpy.flip(dup_data['image'], axis=1)
     dup_data['is_first'] = jax.numpy.flip(dup_data['is_terminal'], axis=1) 
     dup_data['is_last'] = jax.numpy.flip(dup_data['is_first'], axis=1) 
     dup_data['is_terminal'] = jax.numpy.flip(dup_data['is_first'], axis=1) 
-    dup_data['reward'] = jax.numpy.flip(dup_data['reward'], axis=1)
-    dup_data['cont'] = jax.numpy.where(dup_data['is_last'], 0, 1)
 
     num_batches = data['is_first'].shape[0]
     dup_data['action'] = jax.numpy.flip(dup_data['action'], axis=1)
@@ -648,20 +632,14 @@ class Agent(nj.Module):
     dup_img_acts = {k: v[:, dup_num_obs:] for k, v in dup_outs['prevacts'].items()}
     dup_img_outs = self.dup_dyn.imagine(dup_img_start, dup_img_acts)[1]
     dup_rec = dict(
-        **self.dup_dec(dup_rec_outs), reward=self.dup_rew(dup_rec_outs),
-        cont=self.dup_con(dup_rec_outs))
+        **self.dup_dec(dup_rec_outs))
     dup_img = dict(
-        **self.dup_dec(dup_img_outs), reward=self.dup_rew(dup_img_outs),
-        cont=self.dup_con(dup_img_outs))
+        **self.dup_dec(dup_img_outs))
 
     # Duplicated WM Prediction losses
     dup_data_img = {k: v[:, dup_num_obs:] for k, v in dup_data.items()}
     dup_losses = {k: -v.log_prob(dup_data_img[k].astype(f32)) for k, v in dup_img.items()}
     metrics.update({f'dup_openl_{k}_loss': v.mean() for k, v in dup_losses.items()})
-    dup_stats = jaxutils.balance_stats(dup_img['reward'], dup_data_img['reward'], 0.1)
-    metrics.update({f'dup_openl_reward_{k}': v for k, v in dup_stats.items()})
-    dup_stats = jaxutils.balance_stats(dup_img['cont'], dup_data_img['cont'], 0.5)
-    metrics.update({f'dup_openl_cont_{k}': v for k, v in stats.items()})
 
     # Duplicate WM Video predictions
     for key in self.dup_dec.imgkeys:
@@ -681,7 +659,8 @@ class Agent(nj.Module):
           metrics[f'gradnorm/{key}'] = optax.global_norm(grad)
         except KeyError:
           print(f'Skipping gradnorm summary for missing loss: {key}')
-
+    
+    del dup_data
     return metrics, carry_out, dup_carry_out
 
   def preprocess(self, obs):
