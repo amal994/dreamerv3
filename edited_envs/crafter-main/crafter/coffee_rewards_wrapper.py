@@ -91,9 +91,8 @@ class Coffee_rewards_wrapper: #(gym.core.Wrapper):
     }
 
     def __init__(self, env, env_label, required_achievements = ['make_coffee'], max_steps = 500, recipe_id = 0):
-        # super().__init__(env)
+        print('Coffee_rewards_wrapper::__init__ env_label = ', env_label, ', required_achievements = ', required_achievements, ', recipe_id = ', recipe_id, ', max_steps = ', max_steps)
         self.env = env
-
         self.positive_achievements = {achievement: 0 for (achievement, reward) in self.rewards_for_achievements[recipe_id].items() if reward > 0}
         self.first_step_achievement = {achievement: -1 for achievement in self.rewards_for_achievements[recipe_id].keys() }
         self.max_count = max_steps

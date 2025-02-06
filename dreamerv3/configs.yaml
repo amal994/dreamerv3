@@ -74,6 +74,8 @@ defaults:
     agent_process: False
     remote_replay: False
     test_images_folder: 'test_images'
+    scene_label: 'static_size_13_set_0'
+    env_index: 0
 
   wrapper: {length: 0, reset: True, discretize: 0, checks: True}
   env:
@@ -221,7 +223,7 @@ atari100k:
 crafter:
   task: crafter_reward
   run:
-    num_envs: 1
+    num_envs: 8
     log_keys_max: '^log_achievement_.*'
     log_keys_sum: '^log_reward$'
     log_video_fps: 10

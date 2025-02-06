@@ -127,12 +127,13 @@ class GameEnvCreator():
 
         required_achievements = scene.get('required_achievements', None)
         initial_pos = scene.get('initial_pos', None)
+        recipe_id = scene.get('recipe_id', None)
 
         print('Getting env for scene_label = ', scene_label, ', scene_count = ', scene_count, ', env_index = ', env_index, ', view = ', view, ', size = ', size,
               ', show_inventory = ', show_inventory,
               ', area = ', scene['area'][0], ', ', scene['area'][1], ', mapfile = ', scene['mat_map'], ', objfile = ', scene['obj_map'],
               ', required_achievements = ', required_achievements, ', max_steps = ', scene['max_steps'],
-              ', initial_pos = ', initial_pos
+              ', initial_pos = ', initial_pos, ', recipe_id = ', recipe_id
               )
 
         env = crafter.Env(area=(scene['area'][0], scene['area'][1]), view=view, size=size, 
@@ -141,5 +142,6 @@ class GameEnvCreator():
         env = crafter.Coffee_rewards_wrapper(env,
                                      required_achievements=required_achievements,
                                      max_steps=scene['max_steps'],
-                                     env_label=scene['mat_map'])
+                                     env_label=scene['mat_map'], 
+                                     recipe_id=recipe_id)
         return env
