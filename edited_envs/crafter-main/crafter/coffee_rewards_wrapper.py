@@ -87,14 +87,17 @@ class Coffee_rewards_wrapper: #(gym.core.Wrapper):
         'make_coffee_powder': 1,
         'make_coffee': 1,
         'make_boiled_water': 1,
-        'make_lava': 1
+        'make_lava': 1,
+        'collect_spinach': 1,
+        'collect_drink': 1
     }
 
-    def __init__(self, env, env_label, required_achievements = ['make_coffee'], max_steps = 500, recipe_id = 0):
-        print('Coffee_rewards_wrapper::__init__ env_label = ', env_label, ', required_achievements = ', required_achievements, ', recipe_id = ', recipe_id, ', max_steps = ', max_steps)
+    def __init__(self, env, env_label, required_achievements = ['make_coffee'], max_steps = 500):
+        print('Coffee_rewards_wrapper::__init__ env_label = ', env_label, ', required_achievements = ', required_achievements, ', max_steps = ', max_steps)
         self.env = env
-        self.positive_achievements = {achievement: 0 for (achievement, reward) in self.rewards_for_achievements[recipe_id].items() if reward > 0}
-        self.first_step_achievement = {achievement: -1 for achievement in self.rewards_for_achievements[recipe_id].keys() }
+        print('Coffee_rewards_wrapper::__init__::env recipe_id = ', self.env._recipe_id)
+        self.positive_achievements = {achievement: 0 for (achievement, reward) in self.rewards_for_achievements[self.env._recipe_id].items() if reward > 0}
+        self.first_step_achievement = {achievement: -1 for achievement in self.rewards_for_achievements[self.env._recipe_id].keys() }
         self.max_count = max_steps
         self.required_achievements = required_achievements
 
@@ -102,7 +105,6 @@ class Coffee_rewards_wrapper: #(gym.core.Wrapper):
         self.step_count = 0
 
         self.label = env_label
-        self.recipe_id = recipe_id
 
     def __getattr__(self, name):
         if name.startswith('__'):
@@ -113,7 +115,7 @@ class Coffee_rewards_wrapper: #(gym.core.Wrapper):
     def reset(self, **kwargs):
         self.prev_achievements = None
         self.step_count = 0
-        self.first_step_achievement = {achievement: -1 for achievement in self.rewards_for_achievements[self.recipe_id].keys() }
+        self.first_step_achievement = {achievement: -1 for achievement in self.rewards_for_achievements[self.env._recipe_id].keys() }
         return self.env.reset(**kwargs)
 
     def step(self, action):
@@ -132,7 +134,7 @@ class Coffee_rewards_wrapper: #(gym.core.Wrapper):
         if len(info['achievements']) > 0:
             current_achievements = self.get_current_achievements(info['achievements'], self.prev_achievements)
             for i in range(len(current_achievements)):
-                current_ach_reward = self.rewards_for_achievements[self.recipe_id][current_achievements[i]]
+                current_ach_reward = self.rewards_for_achievements[self.env._recipe_id][current_achievements[i]]
                 current_achievement_reward_map[current_achievements[i]] = current_ach_reward
                 achievement_reward += current_ach_reward
             info.update(current_achievement_reward_map = current_achievement_reward_map)

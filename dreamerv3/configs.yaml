@@ -76,6 +76,7 @@ defaults:
     test_images_folder: 'test_images'
     scene_label: 'static_size_13_set_0'
     env_index: 0
+    ground_length: 4
 
   wrapper: {length: 0, reset: True, discretize: 0, checks: True}
   env:

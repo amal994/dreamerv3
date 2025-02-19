@@ -191,11 +191,22 @@ class Agent(nj.Module):
     return (dup_obs_lat, dup_obs_act), ({'image': decoded_img})
 
   def rev_step_in_one_go(self, obs, actions, dup_carry):
-    obs = self.preprocess(obs)
-    dup_embed = self.dup_enc(obs, bdims=1)
+    ground_count = obs['is_first'].shape[1]
 
-    prevact = jaxutils.onehot_dict(dup_carry[1], self.act_space)
-    dup_lat, _ = self.dup_dyn.observe(dup_carry[0], prevact, dup_embed, obs['is_last'], bdims=1)
+    prev_actions = actions['action'][:ground_count]
+    actions['action'] = jnp.delete(actions['action'], np.arange(ground_count-1))
+
+    dup_lat = dup_carry[0]
+    for i in jnp.arange(ground_count):
+      current_obs = {}
+      for k in obs.keys():
+        current_obs[k] = jnp.array([obs[k][0][i]])
+  
+      current_obs = self.preprocess(current_obs)
+      dup_embed = self.dup_enc(current_obs, bdims=1)
+
+      dup_prev_act = jaxutils.onehot_dict({'action': jnp.array([prev_actions[i]], dtype=np.int32)}, self.act_space)
+      dup_lat, _ = self.dup_dyn.observe(dup_lat, dup_prev_act, dup_embed, current_obs['is_last'], bdims=1)
 
     decoded_images = None
 

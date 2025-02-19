@@ -34,7 +34,7 @@ def in_dist_imagination(make_agent, make_env, make_logger, args):
   trajectory_cache = run_utils.TrajectoryCache(['image', 'reward', 'is_first', 'is_last', 'is_terminal', 'log_reward', 'action'])
   image_util = run_utils.ImageUtil(base_folder=args.test_images_folder, experiment_label='in_dist_imagination')
 
-  fns = [bind(make_env, i, needs_episode_reset = True) for i in range(1)] # Temporarily hard coding value to 1 Mad:TODO: Remove this
+  fns = [bind(make_env, i, scene_label = args.scene_label, env_index = args.env_index) for i in range(1)] # Temporarily hard coding value to 1 Mad:TODO: Remove this
   driver = embodied.Driver(fns, args.driver_parallel)
   driver.on_step(lambda tran, _: experiment_tracker.step.increment())
   driver.on_step(lambda tran, _: experiment_tracker.policy_fps.step())
@@ -45,7 +45,7 @@ def in_dist_imagination(make_agent, make_env, make_logger, args):
   checkpoint.agent = agent
   checkpoint.load(args.from_checkpoint, keys=['agent'])
 
-  print('Start evaluation')
+  print('in_dist_imagination::Start evaluation')
   decoded_fwd_images = None
   policy = lambda *args: agent.policy(*args, mode='eval')
   driver.reset(agent.init_policy)
@@ -54,18 +54,26 @@ def in_dist_imagination(make_agent, make_env, make_logger, args):
     fwd_images = driver(policy, steps=1)
     decoded_fwd_images = fwd_images if decoded_fwd_images is None else np.concatenate([decoded_fwd_images, fwd_images], axis=0) 
     experiment_tracker.log_stats()
+    if experiment_tracker.is_first_episode_complete:
+      print('in_dist_imagination::single episode completed successfully')
+      break
   
   num_recorded_trans = trajectory_cache.get_cache_count()
-  final_obs = trajectory_cache.get_obs_at(num_recorded_trans - 1)
-  del final_obs['action']
+  print('in_dist_imagination::number of recorded transitions = ', num_recorded_trans)
+  print('in_dist_imagination::number of transitions to be used to ground agent = ', args.ground_length)
 
-  actions_of_interest = trajectory_cache.get_actions()[::-1][1:]
-  decoded_rev_images = rev_step_in_one_go(final_obs, actions_of_interest, driver.dup_carry)
+  final_observations = trajectory_cache.get_rev_obss_between(num_recorded_trans - args.ground_length, num_recorded_trans)
+  del final_observations['action']
+
+  actions_of_interest = trajectory_cache.get_actions()
+  actions_of_interest = np.flip(actions_of_interest, axis=0)[1:]
+
+  decoded_rev_images = rev_step_in_one_go(final_observations, actions_of_interest, driver.dup_carry)
 
   for i in range(len(decoded_rev_images)):
-    image_util.print_all_images(actual_image=trajectory_cache.get_image_at(num_recorded_trans - 2 - i),
-                            fwd_pred_image=decoded_fwd_images[num_recorded_trans - 2 - i], 
+    image_util.print_all_images(actual_image=trajectory_cache.get_image_at(num_recorded_trans - 1 - args.ground_length - i),
+                            fwd_pred_image=decoded_fwd_images[num_recorded_trans - 1 - args.ground_length - i], 
                             rev_pred_images=decoded_rev_images[i][np.newaxis, :], 
-                            name_prefix=str(num_recorded_trans - 2 - i))
+                            name_prefix=str(num_recorded_trans - 1 - args.ground_length - i))
 
   experiment_tracker.experiment_complete()

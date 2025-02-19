@@ -138,10 +138,11 @@ class GameEnvCreator():
 
         env = crafter.Env(area=(scene['area'][0], scene['area'][1]), view=view, size=size, 
                           reward=(task == 'reward'), seed=seed,
-                          mapfile=scene['mat_map'], objfile=scene['obj_map'], show_inventory=show_inventory, initial_pos=initial_pos, assets=assets_name)
+                          mapfile=scene['mat_map'], objfile=scene['obj_map'], 
+                          show_inventory=show_inventory, initial_pos=initial_pos, 
+                          assets=assets_name, recipe_id=recipe_id)
         env = crafter.Coffee_rewards_wrapper(env,
                                      required_achievements=required_achievements,
                                      max_steps=scene['max_steps'],
-                                     env_label=scene['mat_map'], 
-                                     recipe_id=recipe_id)
+                                     env_label=scene['mat_map'])
         return env

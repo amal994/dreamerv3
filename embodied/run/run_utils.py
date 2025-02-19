@@ -85,7 +85,14 @@ class TrajectoryCache:
     
     def get_obs_at(self, i):
         return {k:np.array([self.observations[k][i]]) for k in self.keys_of_interest}
-    
+
+    def get_rev_obss_between(self, start_index, stop_index):
+        observations = {}
+        for k in self.keys_of_interest:
+            observations[k] = np.flip(np.array([self.observations[k][start_index:stop_index]]), axis = 1)
+            print('TrajectoryCache::get_rev_obss_between observations[', str(k), '].shape = ', observations[k].shape)
+        return observations
+
     def get_cache_count(self):
         return len(self.get_actions())
 
@@ -105,7 +112,8 @@ class ExperimentTracker:
         self.episodes = defaultdict(embodied.Agg)
         self.should_log = embodied.when.Clock(self.args.log_every)
         self.policy_fps = embodied.FPS()
-        
+        self.is_first_episode_complete = False
+
     @embodied.timer.section('log_step')
     def log_step(self, tran, worker):
         episode = self.episodes[worker]
@@ -130,6 +138,7 @@ class ExperimentTracker:
 
         if tran['is_last']:
             result = episode.result()
+            self.is_first_episode_complete = True
 
             self.logger.add({
                 'score': result.pop('score'),
