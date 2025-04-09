@@ -140,3 +140,141 @@ scenes:
                             max_steps: 500, initial_pos: [13, 6],
                             required_achievements: ['make_coffee'], recipe_id: 3},
     ]
+  static_size_13_abberation_set_0:
+    [
+      {area: [13, 13], mat_map: 'kitchen_garden_13_aou_0_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_aou_1_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_aou_2_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_aou_3_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_aoo_0_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_aoo_1_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_aoo_2_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_aoo_3_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_rno_0_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_rno_1_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_rno_2_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_rno_3_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_reo_0_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_reo_1_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_reo_2_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_reo_3_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_mol_0_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_mol_1_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_mol_2_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_mol_3_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+      {area: [13, 13], mat_map: 'kitchen_garden_13_rno_4_mat.csv', obj_map: 'kitchen_garden_13_0_obj.csv',
+                            max_steps: 500, initial_pos: [6, 9],
+                            required_achievements: ['make_coffee']},
+    ]
+  static_size_15_abberation_set_0:
+    [
+      {area: [15, 15], mat_map: 'kitchen_garden_15_0_aoo_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [11, 14],
+                            required_achievements: ['make_coffee'], recipe_id: 0},
+
+      {area: [15, 15], mat_map: 'kitchen_garden_15_0_rno_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [11, 14],
+                            required_achievements: ['make_coffee'], recipe_id: 0},
+
+      {area: [15, 15], mat_map: 'kitchen_garden_15_0_reo_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [11, 14],
+                            required_achievements: ['make_coffee'], recipe_id: 0},
+
+      {area: [15, 15], mat_map: 'kitchen_garden_15_0_mol_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [11, 14],
+                            required_achievements: ['make_coffee'], recipe_id: 0}
+    ]
+  static_size_15_abberation_set_1:
+    [
+      {area: [15, 15], mat_map: 'kitchen_garden_15_1_aoo_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [10, 10],
+                            required_achievements: ['make_coffee'], recipe_id: 1},
+
+      {area: [15, 15], mat_map: 'kitchen_garden_15_1_rno_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [10, 10],
+                            required_achievements: ['make_coffee'], recipe_id: 1},
+
+      {area: [15, 15], mat_map: 'kitchen_garden_15_1_reo_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [10, 10],
+                            required_achievements: ['make_coffee'], recipe_id: 1},
+
+      {area: [15, 15], mat_map: 'kitchen_garden_15_1_mol_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [10, 10],
+                            required_achievements: ['make_coffee'], recipe_id: 1}
+    ]
+  static_size_15_abberation_set_2:
+    [
+      {area: [15, 15], mat_map: 'kitchen_garden_15_2_aoo_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [4, 14],
+                            required_achievements: ['make_coffee'], recipe_id: 2},
+
+      {area: [15, 15], mat_map: 'kitchen_garden_15_2_rno_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [4, 14],
+                            required_achievements: ['make_coffee'], recipe_id: 2},
+
+      {area: [15, 15], mat_map: 'kitchen_garden_15_2_reo_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [4, 14],
+                            required_achievements: ['make_coffee'], recipe_id: 2},
+
+      {area: [15, 15], mat_map: 'kitchen_garden_15_2_mol_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [4, 14],
+                            required_achievements: ['make_coffee'], recipe_id: 2}
+    ]
+  static_size_15_abberation_set_3:
+    [
+      {area: [15, 15], mat_map: 'kitchen_garden_15_3_aoo_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [13, 6],
+                            required_achievements: ['make_coffee'], recipe_id: 3},
+
+      {area: [15, 15], mat_map: 'kitchen_garden_15_3_rno_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [13, 6],
+                            required_achievements: ['make_coffee'], recipe_id: 3},
+
+      {area: [15, 15], mat_map: 'kitchen_garden_15_3_reo_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [13, 6],
+                            required_achievements: ['make_coffee'], recipe_id: 3},
+
+      {area: [15, 15], mat_map: 'kitchen_garden_15_3_mol_mat.csv', obj_map: 'kitchen_garden_15_0_obj.csv',
+                            max_steps: 500, initial_pos: [13, 6],
+                            required_achievements: ['make_coffee'], recipe_id: 3}
+    ]

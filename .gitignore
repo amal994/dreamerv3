@@ -4,4 +4,15 @@ __pycache__/
 *.py[cod]
 *.egg-info
 MUJOCO_LOG.TXT
+*.gif
+*.wandb
+*.log
+wandb/*
+temp
+commands.txt
+backup*
+*test_images*
+exp_images/*
+local_writing/*
+logs/*
 ;

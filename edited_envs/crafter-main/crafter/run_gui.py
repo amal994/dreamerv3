@@ -16,7 +16,7 @@ def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--seed', type=int, default=None)
   parser.add_argument('--area', nargs=2, type=int, default=(64, 64))
-  parser.add_argument('--view', type=int, nargs=2, default=(9, 9))
+  parser.add_argument('--view', type=int, nargs=2, default=(15, 15))
   parser.add_argument('--length', type=int, default=None)
   parser.add_argument('--health', type=int, default=9)
   parser.add_argument('--window', type=int, nargs=2, default=(600, 600))
@@ -26,6 +26,14 @@ def main():
   parser.add_argument('--wait', type=boolean, default=False)
   parser.add_argument('--death', type=str, default='reset', choices=[
       'continue', 'reset', 'quit'])
+  
+  parser.add_argument('--mapfile', type=str, default=None)
+  parser.add_argument('--objfile', type=str, default=None)
+  parser.add_argument('--show_inventory', type=boolean, default=False)
+  parser.add_argument('--initial_pos', nargs=2, type=int, default=(6, 6))
+  parser.add_argument('--env_label', type=str, default=None)
+  parser.add_argument('--recipe_id', type=int, default=0)
+
   args = parser.parse_args()
 
   keymap = {
@@ -36,17 +44,12 @@ def main():
       pygame.K_SPACE: 'do',
       pygame.K_TAB: 'sleep',
 
-      pygame.K_r: 'place_stone',
-      pygame.K_t: 'place_table',
-      pygame.K_f: 'place_furnace',
-      pygame.K_p: 'place_plant',
-
-      pygame.K_1: 'make_wood_pickaxe',
-      pygame.K_2: 'make_stone_pickaxe',
-      pygame.K_3: 'make_iron_pickaxe',
-      pygame.K_4: 'make_wood_sword',
-      pygame.K_5: 'make_stone_sword',
-      pygame.K_6: 'make_iron_sword',
+      pygame.K_0: 'make_coffee',
+      pygame.K_1: 'make_roasted_coffee_bean',
+      pygame.K_2: 'make_boiled_milk',
+      pygame.K_3: 'make_coffee_powder',
+      pygame.K_4: 'make_boiled_water',
+      pygame.K_5: 'make_lava',
   }
   print('Actions:')
   for key, action in keymap.items():
@@ -59,9 +62,18 @@ def main():
   size[0] = size[0] or args.window[0]
   size[1] = size[1] or args.window[1]
 
+  if args.mapfile is not None:
+    area = (15, 15)
+  else:
+    area = args.area
+
   env = crafter.Env(
-      area=args.area, view=args.view, length=args.length, seed=args.seed)
-  env = crafter.Recorder(env, args.record)
+      area=area, view=args.view, length=args.length, seed=args.seed, mapfile=args.mapfile, objfile=args.objfile, show_inventory=args.show_inventory, initial_pos=args.initial_pos, recipe_id=args.recipe_id)
+  
+  env = crafter.Coffee_rewards_wrapper(env, env_label=args.env_label)
+
+  # env = crafter.Recorder(env, args.record)
+
   env.reset()
   achievements = set()
   duration = 0

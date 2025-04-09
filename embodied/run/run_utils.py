@@ -83,6 +83,9 @@ class TrajectoryCache:
     def get_image_at(self, i):
         return self.observations['image'][i]
     
+    def get_images(self):
+        return self.observations['image']
+    
     def get_obs_at(self, i):
         return {k:np.array([self.observations[k][i]]) for k in self.keys_of_interest}
 

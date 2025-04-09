@@ -57,7 +57,7 @@ def eval_only(make_agent, make_env, make_logger, args):
         result['reward_rate'] = (np.abs(rew[1:] - rew[:-1]) >= 0.01).mean()
       epstats.add(result)
 
-  fns = [bind(make_env, i) for i in range(args.num_envs)]
+  fns = [bind(make_env, i, scene_label = args.scene_label, env_index = args.env_index) for i in range(1)] # Temporarily hard coding value to 1 Mad:TODO: Remove this
   driver = embodied.Driver(fns, args.driver_parallel)
   driver.on_step(lambda tran, _: step.increment())
   driver.on_step(lambda tran, _: policy_fps.step())
